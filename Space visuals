@@ -1,0 +1,926 @@
+const SpaceVisuals = (() => {
+    function tex(draw, w = 256, h = 256) {
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        draw(c.getContext('2d'), w, h);
+        return new THREE.CanvasTexture(c);
+    }
+
+    function radial(stops) {
+        return tex((g, w, h) => {
+            const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+            stops.forEach(([at, a]) => gr.addColorStop(at, 'rgba(255,255,255,' + a + ')'));
+            g.fillStyle = gr;
+            g.fillRect(0, 0, w, h);
+        }, 64, 64);
+    }
+
+    const DOT = radial([[0, 1], [0.25, 0.6], [1, 0]]);
+    const SOFT = radial([[0, 0.5], [0.5, 0.15], [1, 0]]);
+
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const gauss = () => Math.sqrt(-2 * Math.log(Math.random() + 1e-9)) * Math.cos(2 * Math.PI * Math.random());
+    const col = (c) => new THREE.Color(c);
+    const mix = (a, b, t) => col(a).lerp(col(b), Math.min(1, Math.max(0, t)));
+
+    function glow(color, size, opacity = 1) {
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: DOT, color, transparent: true, opacity, depthWrite: false,
+            blending: THREE.AdditiveBlending, toneMapped: false
+        }));
+        s.scale.set(size, size, 1);
+        return s;
+    }
+
+    function cloud(pts, size, opts = {}) {
+        const pos = new Float32Array(pts.length * 3);
+        const cols = new Float32Array(pts.length * 3);
+        pts.forEach((p, i) => {
+            pos[i * 3] = p[0];
+            pos[i * 3 + 1] = p[1];
+            pos[i * 3 + 2] = p[2];
+            cols[i * 3] = p[3].r;
+            cols[i * 3 + 1] = p[3].g;
+            cols[i * 3 + 2] = p[3].b;
+        });
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+        const material = new THREE.PointsMaterial({
+            size, map: opts.map || DOT, vertexColors: true, transparent: true,
+            opacity: opts.opacity === undefined ? 1 : opts.opacity, depthWrite: false,
+            blending: opts.blending || THREE.AdditiveBlending, toneMapped: false
+        });
+        if (!opts.map) {
+            const maxPx = 7 * Math.min(window.devicePixelRatio || 1, 2);
+            material.onBeforeCompile = (shader) => {
+                shader.uniforms.maxPx = { value: maxPx };
+                shader.vertexShader = 'uniform float maxPx;\n' + shader.vertexShader.replace(
+                    '#include <fog_vertex>',
+                    '#include <fog_vertex>\n\tgl_PointSize = min(gl_PointSize, maxPx);'
+                );
+            };
+        }
+        return new THREE.Points(geo, material);
+    }
+
+    function lit(color, extra = {}) {
+        return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6, metalness: 0.3, toneMapped: false }, extra));
+    }
+
+    function basic(color, extra = {}) {
+        return new THREE.MeshBasicMaterial(Object.assign({ color, toneMapped: false }, extra));
+    }
+
+    function additive(color, opacity = 0.6) {
+        return basic(color, { transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    }
+
+    function surfaceTex(o) {
+        return tex((g, w, h) => {
+            g.fillStyle = o.color;
+            g.fillRect(0, 0, w, h);
+            g.fillStyle = o.spots || o.color;
+            g.globalAlpha = 0.6;
+            for (let i = 0; i < 45; i++) {
+                const r = rand(3, 18);
+                g.beginPath();
+                g.ellipse(rand(0, w), rand(0, h), r, r * rand(0.5, 1), rand(0, 3), 0, Math.PI * 2);
+                g.fill();
+            }
+            g.globalAlpha = 1;
+            if (o.lines) {
+                g.strokeStyle = o.lines;
+                g.lineWidth = 1.5;
+                for (let i = 0; i < 30; i++) {
+                    g.beginPath();
+                    g.moveTo(rand(0, w), rand(0, h));
+                    g.quadraticCurveTo(rand(0, w), rand(0, h), rand(0, w), rand(0, h));
+                    g.stroke();
+                }
+            }
+            if (o.heart) {
+                g.fillStyle = '#f3e9dc';
+                g.beginPath();
+                g.ellipse(w * 0.55, h * 0.55, w * 0.1, h * 0.17, 0.3, 0, Math.PI * 2);
+                g.ellipse(w * 0.66, h * 0.58, w * 0.09, h * 0.15, -0.3, 0, Math.PI * 2);
+                g.fill();
+            }
+            if (o.cap) {
+                g.fillStyle = o.cap;
+                g.fillRect(0, 0, w, h * 0.12);
+            }
+        }, 256, 128);
+    }
+
+    function sphereBody(o) {
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(o.r, 40, 24),
+            new THREE.MeshStandardMaterial({ map: surfaceTex(o), roughness: 1, toneMapped: false })
+        );
+        if (o.scale) mesh.scale.set(...o.scale);
+        const group = new THREE.Group();
+        group.add(mesh);
+        if (o.haze) {
+            group.add(new THREE.Mesh(new THREE.SphereGeometry(o.r * 1.08, 32, 16),
+                lit(o.haze, { transparent: true, opacity: 0.35, depthWrite: false })));
+        }
+        if (o.ring) {
+            const ring = new THREE.Mesh(new THREE.RingGeometry(o.r * 1.8, o.r * 2.1, 64), additive('#d8d0c0', 0.4));
+            ring.rotation.x = -Math.PI / 2;
+            group.add(ring);
+        }
+        return { object: group, size: o.r * (o.scale ? Math.max(...o.scale) : 1), update: (t) => { mesh.rotation.y = t * 0.15; } };
+    }
+
+    function rockGeo(r, seed) {
+        const geo = new THREE.IcosahedronGeometry(r, 3);
+        const p = geo.attributes.position;
+        const v = new THREE.Vector3();
+        for (let i = 0; i < p.count; i++) {
+            v.fromBufferAttribute(p, i);
+            const x = v.x / r;
+            const y = v.y / r;
+            const z = v.z / r;
+            const n = (Math.sin(x * 3.1 + seed) + Math.sin(y * 4.3 + seed * 1.7) + Math.sin(z * 3.7 + seed * 2.3) + Math.sin((x + y) * 6 + seed)) / 8;
+            v.multiplyScalar(0.85 + n * 0.5);
+            p.setXYZ(i, v.x, v.y, v.z);
+        }
+        geo.computeVertexNormals();
+        return geo;
+    }
+
+    function rock(o) {
+        const mesh = new THREE.Mesh(rockGeo(o.r, rand(0, 10)),
+            lit(o.color, { roughness: 1, metalness: o.metal || 0, flatShading: true }));
+        if (o.scale) mesh.scale.set(...o.scale);
+        const group = new THREE.Group();
+        group.add(mesh);
+        if (o.lobe) {
+            const lobe = new THREE.Mesh(rockGeo(o.r * 0.7, rand(0, 10)), mesh.material);
+            lobe.position.set(o.r * 1.1, o.r * 0.3, 0);
+            group.add(lobe);
+        }
+        if (o.moonlet) {
+            const m = new THREE.Mesh(rockGeo(o.r * 0.25, rand(0, 10)), mesh.material);
+            m.position.set(o.r * 2.2, 0, 0);
+            group.add(m);
+        }
+        return {
+            object: group,
+            size: o.r * (o.scale ? Math.max(...o.scale) : 1) * (o.moonlet ? 2.2 : 1.3),
+            update: (t) => { mesh.rotation.y = t * 0.3; mesh.rotation.x = t * 0.1; }
+        };
+    }
+
+    function comet(o, ctx) {
+        const group = new THREE.Group();
+        const body = rock({ r: o.r, color: '#5b5550', lobe: o.lobe });
+        group.add(body.object);
+        group.add(glow(o.color, o.r * 10, 0.7));
+        const tails = [[o.color, 0, 1]];
+        if (o.ionTail) tails.push(['#6fa8ff', 0.25, 0.8]);
+        tails.forEach(([c, bend, len]) => {
+            const pts = [];
+            const L = o.tail * len;
+            for (let i = 0; i < 2500; i++) {
+                const x = Math.pow(Math.random(), 1.5) * L;
+                const spread = 0.3 + x * 0.12;
+                pts.push([x, gauss() * spread + x * bend * 0.4, gauss() * spread, mix(c, '#000000', x / L * 0.85)]);
+            }
+            group.add(cloud(pts, o.r * 0.9));
+        });
+        group.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), ctx.away);
+        return { object: group, size: o.tail * 0.35, update: body.update };
+    }
+
+    function belt(o) {
+        const pts = [];
+        for (let i = 0; i < o.count; i++) {
+            const a = rand(0, Math.PI * 2);
+            const r = rand(o.inner, o.outer);
+            pts.push([Math.cos(a) * r, gauss() * o.thick, Math.sin(a) * r, mix(o.color, '#ffffff', rand(0, 0.4))]);
+        }
+        const p = cloud(pts, o.dot);
+        return { object: p, size: o.outer, region: true, update: (t) => { p.rotation.y = t * 0.004; } };
+    }
+
+    function shell(o) {
+        const pts = [];
+        const v = new THREE.Vector3();
+        for (let i = 0; i < o.count; i++) {
+            v.set(gauss(), gauss(), gauss()).normalize().multiplyScalar(rand(o.inner, o.outer));
+            pts.push([v.x, v.y, v.z, mix(o.color, '#ffffff', rand(0, 0.5))]);
+        }
+        return { object: cloud(pts, o.dot, { opacity: 0.8 }), size: o.outer, region: true };
+    }
+
+    function star(o) {
+        const group = new THREE.Group();
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(o.r, 40, 24), basic(o.color)));
+        group.add(glow(o.color, o.r * (o.glow || 4)));
+        group.add(glow(o.color, o.r * (o.glow || 4) * 2.2, 0.25));
+        let size = o.r * 1.5;
+        if (o.companion) {
+            const c = new THREE.Group();
+            c.add(new THREE.Mesh(new THREE.SphereGeometry(o.companion.r, 24, 16), basic(o.companion.color)));
+            c.add(glow(o.companion.color, o.companion.r * 6));
+            c.position.set(o.companion.d, 0, 0);
+            group.add(c);
+            size = Math.max(size, o.companion.d * 0.8);
+        }
+        let beams = null;
+        if (o.beams) {
+            beams = new THREE.Group();
+            [1, -1].forEach((s) => {
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(1.2, o.beams, 24, 1, true), additive('#7fd6ff', 0.35));
+                cone.position.y = s * o.beams / 2;
+                if (s > 0) cone.rotation.x = Math.PI;
+                beams.add(cone);
+            });
+            beams.rotation.z = 0.5;
+            group.add(beams);
+            size = o.beams * 0.7;
+        }
+        let shellPts = null;
+        if (o.explode) {
+            const pts = [];
+            const v = new THREE.Vector3();
+            for (let i = 0; i < 4000; i++) {
+                v.set(gauss(), gauss(), gauss()).normalize().multiplyScalar(o.explode * rand(0.85, 1.05));
+                pts.push([v.x, v.y, v.z, mix('#fff3c0', '#ff4a1c', Math.random())]);
+            }
+            shellPts = cloud(pts, 1.6);
+            group.add(shellPts);
+            size = o.explode;
+        }
+        return {
+            object: group,
+            size,
+            update: (t) => {
+                if (beams) beams.rotation.y = t * 2;
+                if (shellPts) {
+                    const k = (t * 0.15) % 1;
+                    shellPts.scale.setScalar(0.2 + k);
+                    shellPts.material.opacity = 1 - k * 0.8;
+                }
+            }
+        };
+    }
+
+    function diskPoints(inner, outer, count, hot, cool) {
+        const pts = [];
+        for (let i = 0; i < count; i++) {
+            const a = rand(0, Math.PI * 2);
+            const r = inner + Math.pow(Math.random(), 1.4) * (outer - inner);
+            pts.push([Math.cos(a) * r, gauss() * (outer * 0.01), Math.sin(a) * r, mix(hot, cool, (r - inner) / (outer - inner))]);
+        }
+        return cloud(pts, inner * 0.18);
+    }
+
+    function blackhole(o) {
+        const group = new THREE.Group();
+        const tilt = new THREE.Group();
+        tilt.rotation.x = o.tilt || 1.05;
+        group.add(tilt);
+        const hole = new THREE.Mesh(new THREE.SphereGeometry(o.r, 40, 24), basic('#000000'));
+        group.add(hole);
+        group.add(glow(o.glowColor || '#ff9a3c', o.r * (o.glowSize || 3.2), 0.9));
+        const disk = diskPoints(o.r * 1.4, o.r * (o.disk || 4), o.count || 5000, '#fff6e0', o.diskColor || '#ff5a1a');
+        tilt.add(disk);
+        let size = o.r * (o.disk || 4);
+        if (o.jets) {
+            [1, -1].forEach((s) => {
+                const pts = [];
+                for (let i = 0; i < 1500; i++) {
+                    const y = Math.random() * o.jets;
+                    pts.push([gauss() * (0.2 + y * 0.03), s * y, gauss() * (0.2 + y * 0.03), mix('#cfe6ff', '#2a5bff', y / o.jets)]);
+                }
+                tilt.add(cloud(pts, o.r * 0.25));
+            });
+            size = Math.max(size, o.jets * 0.6);
+        }
+        if (o.companion) {
+            const c = new THREE.Group();
+            c.add(new THREE.Mesh(new THREE.SphereGeometry(o.companion.r, 24, 16), basic(o.companion.color)));
+            c.add(glow(o.companion.color, o.companion.r * 6));
+            c.position.set(o.companion.d, 0, 0);
+            group.add(c);
+            if (o.stream) {
+                const pts = [];
+                for (let i = 0; i < 1200; i++) {
+                    const k = Math.random();
+                    const a = k * 2.5;
+                    const r = o.companion.d * (1 - k) + o.r * 2 * k;
+                    pts.push([Math.cos(a) * r, gauss() * 0.15, Math.sin(a) * r, mix('#9fd0ff', '#ffb066', k)]);
+                }
+                tilt.add(cloud(pts, o.r * 0.25));
+            }
+            size = Math.max(size, o.companion.d * 0.8);
+        }
+        let pair = null;
+        let waves = [];
+        if (o.merger) {
+            hole.visible = false;
+            disk.visible = false;
+            pair = new THREE.Group();
+            [1, -1].forEach((s) => {
+                const h = new THREE.Mesh(new THREE.SphereGeometry(o.r * 0.6, 24, 16), basic('#000000'));
+                h.position.x = s * o.r * 1.6;
+                h.add(glow('#9fc8ff', o.r * 2.5, 0.8));
+                pair.add(h);
+            });
+            group.add(pair);
+            for (let i = 0; i < 5; i++) {
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.03, 8, 96), additive('#7fb0ff', 0.6));
+                ring.rotation.x = Math.PI / 2;
+                group.add(ring);
+                waves.push(ring);
+            }
+            size = o.r * 6;
+        }
+        return {
+            object: group,
+            size,
+            update: (t) => {
+                disk.rotation.y = t * 0.25;
+                if (pair) pair.rotation.y = t * 1.6;
+                waves.forEach((w, i) => {
+                    const k = ((t * 0.25) + i / waves.length) % 1;
+                    w.scale.setScalar(o.r * (2 + k * 12));
+                    w.material.opacity = 0.6 * (1 - k);
+                });
+            }
+        };
+    }
+
+    function spiral(o) {
+        const group = new THREE.Group();
+        const disk = new THREE.Group();
+        group.add(disk);
+        const pts = [];
+        const R = o.R;
+        for (let i = 0; i < (o.count || 9000); i++) {
+            const roll = Math.random();
+            if (roll < 0.22) {
+                const r = Math.abs(gauss()) * R * (o.bulge || 0.12);
+                const v = new THREE.Vector3(gauss(), gauss() * 0.6, gauss()).normalize().multiplyScalar(r);
+                pts.push([v.x, v.y, v.z, mix('#fff2cf', o.core || '#ffd27a', Math.random())]);
+            } else if (o.bar && roll < 0.3) {
+                const x = rand(-1, 1) * R * 0.3;
+                pts.push([x, gauss() * R * 0.01, gauss() * R * 0.03, mix(o.core || '#ffd27a', '#ffffff', Math.random())]);
+            } else {
+                const r = R * Math.pow(Math.random(), 0.7) + R * 0.05;
+                const arm = Math.floor(Math.random() * o.arms);
+                const a = arm * (Math.PI * 2 / o.arms) + (r / R) * (o.twist || 5) + gauss() * 0.28;
+                const pink = Math.random() < 0.04;
+                const c = pink ? col('#ff6fae') : mix(o.core || '#ffd27a', o.arm || '#8fb8ff', r / R);
+                pts.push([Math.cos(a) * r + gauss() * R * 0.03, gauss() * R * 0.015, Math.sin(a) * r + gauss() * R * 0.03, c]);
+            }
+        }
+        disk.add(cloud(pts, R * 0.03));
+        disk.add(glow(o.core || '#ffd27a', R * (o.coreGlow || 0.7)));
+        if (o.dustLane) {
+            const lane = new THREE.Mesh(new THREE.RingGeometry(R * 0.55, R * 0.9, 96),
+                basic('#120a05', { transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+            lane.rotation.x = -Math.PI / 2;
+            disk.add(lane);
+        }
+        if (o.companion) {
+            const c = glow('#ffe2b0', R * 0.35);
+            c.position.set(R * 1.05, R * 0.05, R * 0.2);
+            group.add(c);
+        }
+        group.rotation.x = o.tilt || 0.5;
+        group.rotation.z = o.roll || 0;
+        return { object: group, size: R * 1.1, update: (t) => { disk.rotation.y = t * 0.02; } };
+    }
+
+    function elliptical(o) {
+        const group = new THREE.Group();
+        const pts = [];
+        for (let i = 0; i < 9000; i++) {
+            const r = Math.abs(gauss()) * o.R * 0.35;
+            const v = new THREE.Vector3(gauss(), gauss() * (o.flat || 0.8), gauss()).normalize().multiplyScalar(r);
+            pts.push([v.x, v.y, v.z, mix('#fff4dc', '#ffc27a', Math.random())]);
+        }
+        group.add(cloud(pts, o.R * 0.03));
+        group.add(glow('#ffe6b8', o.R * 0.8));
+        if (o.globulars) {
+            const g = [];
+            for (let i = 0; i < 400; i++) {
+                const v = new THREE.Vector3(gauss(), gauss(), gauss()).normalize().multiplyScalar(rand(o.R * 0.5, o.R * 1.1));
+                g.push([v.x, v.y, v.z, col('#fff0c8')]);
+            }
+            group.add(cloud(g, o.R * 0.015));
+        }
+        if (o.jet) {
+            const j = [];
+            for (let i = 0; i < 1500; i++) {
+                const x = Math.random() * o.R;
+                j.push([x, gauss() * 0.3, gauss() * 0.3, mix('#d8ecff', '#4f7dff', x / o.R)]);
+            }
+            const jet = cloud(j, o.R * 0.01);
+            jet.rotation.z = 0.4;
+            group.add(jet);
+        }
+        return { object: group, size: o.R };
+    }
+
+    function irregular(o) {
+        const pts = [];
+        const clumps = Array.from({ length: o.clumps || 7 }, () => [gauss() * o.R * 0.35, gauss() * o.R * 0.12, gauss() * o.R * 0.35]);
+        for (let i = 0; i < 6000; i++) {
+            const c = clumps[Math.floor(Math.random() * clumps.length)];
+            const pink = Math.random() < 0.05;
+            pts.push([c[0] + gauss() * o.R * 0.15, c[1] + gauss() * o.R * 0.05, c[2] + gauss() * o.R * 0.15, pink ? col('#ff7ab8') : mix('#cfe0ff', '#fff2d8', Math.random())]);
+        }
+        const group = new THREE.Group();
+        group.add(cloud(pts, o.R * 0.035));
+        if (o.nebula) {
+            const n = glow('#ff6fa0', o.R * 0.5, 0.7);
+            n.position.set(o.R * 0.25, 0, o.R * 0.1);
+            group.add(n);
+        }
+        return { object: group, size: o.R };
+    }
+
+    function galaxyCluster(o) {
+        const pts = [];
+        const centers = [];
+        for (let i = 0; i < o.n; i++) {
+            const v = new THREE.Vector3(gauss(), gauss() * (o.flat || 1), gauss()).normalize().multiplyScalar(o.shell ? o.R * rand(0.6, 1) : Math.abs(gauss()) * o.R * 0.45);
+            centers.push(v);
+            const base = o.colors[Math.floor(Math.random() * o.colors.length)];
+            const k = o.per || 40;
+            for (let j = 0; j < k; j++) {
+                pts.push([v.x + gauss() * o.blob, v.y + gauss() * o.blob * 0.4, v.z + gauss() * o.blob, mix(base, '#ffffff', Math.random() * 0.4)]);
+            }
+        }
+        if (o.web) {
+            for (let i = 0; i < centers.length; i++) {
+                const a = centers[i];
+                const b = centers[Math.floor(Math.random() * centers.length)];
+                for (let j = 0; j < 30; j++) {
+                    const k = Math.random();
+                    pts.push([a.x + (b.x - a.x) * k + gauss() * 0.6, a.y + (b.y - a.y) * k + gauss() * 0.6, a.z + (b.z - a.z) * k + gauss() * 0.6, col(o.web)]);
+                }
+            }
+        }
+        const group = new THREE.Group();
+        const p = cloud(pts, o.dot || o.blob * 0.5);
+        group.add(p);
+        if (o.big) {
+            o.big.forEach(([x, y, z, s, c]) => {
+                const g = glow(c, s);
+                g.position.set(x, y, z);
+                group.add(g);
+            });
+        }
+        return { object: group, size: o.R, update: (t) => { group.rotation.y = t * 0.01; } };
+    }
+
+    function nebula(o) {
+        const group = new THREE.Group();
+        const pts = [];
+        const R = o.R;
+        const pal = o.colors;
+        const pick = () => col(pal[Math.floor(Math.random() * pal.length)]);
+        if (o.shape === 'ring') {
+            for (let i = 0; i < 6000; i++) {
+                const a = rand(0, Math.PI * 2);
+                const r = R * (0.55 + Math.abs(gauss()) * 0.18);
+                const t = (r / R - 0.55) / 0.5;
+                pts.push([Math.cos(a) * r, gauss() * R * 0.12, Math.sin(a) * r, mix(pal[0], pal[1], t)]);
+            }
+            for (let i = 0; i < 1500; i++) {
+                const v = new THREE.Vector3(gauss(), gauss() * 0.3, gauss()).normalize().multiplyScalar(R * rand(0, 0.5));
+                pts.push([v.x, v.y, v.z, col(pal[2] || pal[0]).multiplyScalar(0.5)]);
+            }
+            group.add(glow('#ffffff', R * 0.12));
+            group.rotation.x = o.tilt || 1.2;
+        } else if (o.shape === 'remnant') {
+            for (let i = 0; i < 7000; i++) {
+                const v = new THREE.Vector3(gauss(), gauss() * 0.7, gauss()).normalize();
+                const n = Math.sin(v.x * 9) * Math.sin(v.y * 11) * Math.sin(v.z * 7);
+                const r = R * (Math.abs(n) > 0.25 ? rand(0.8, 1) : rand(0.2, 0.8));
+                v.multiplyScalar(r);
+                pts.push([v.x, v.y, v.z, Math.abs(n) > 0.25 ? pick() : col('#6f9cff').multiplyScalar(0.6)]);
+            }
+            group.add(glow('#cfe4ff', R * 0.2));
+        } else if (o.shape === 'pillars') {
+            for (let i = 0; i < 3000; i++) {
+                pts.push([gauss() * R * 0.6, gauss() * R * 0.5, gauss() * R * 0.3 - R * 0.3, mix(pal[1], pal[2], Math.random()).multiplyScalar(0.6)]);
+            }
+            [[-0.3, 1, 0.12], [0.05, 0.75, 0.1], [0.35, 0.55, 0.08]].forEach(([x, hgt, w]) => {
+                for (let i = 0; i < 1800; i++) {
+                    const y = rand(-R * 0.6, -R * 0.6 + R * hgt);
+                    const tip = y > -R * 0.6 + R * hgt * 0.9;
+                    pts.push([x * R + gauss() * R * w, y, gauss() * R * w * 0.6, tip ? col('#ffd08a').multiplyScalar(0.6) : col(pal[0]).multiplyScalar(0.45)]);
+                }
+            });
+        } else if (o.shape === 'dark') {
+            for (let i = 0; i < 4000; i++) {
+                pts.push([gauss() * R * 0.6, gauss() * R * 0.45, gauss() * R * 0.2 - R * 0.2, pick()]);
+            }
+            const dark = [];
+            for (let i = 0; i < 2500; i++) {
+                const neck = Math.random() < 0.6;
+                const x = neck ? gauss() * R * 0.07 : R * 0.12 + gauss() * R * 0.1;
+                const y = neck ? rand(-R * 0.6, R * 0.05) : R * 0.12 + gauss() * R * 0.08;
+                dark.push([x, y, R * 0.1 + gauss() * R * 0.04, col('#1a0d08')]);
+            }
+            group.add(cloud(dark, R * 0.12, { map: SOFT, blending: THREE.NormalBlending, opacity: 0.9 }));
+        } else {
+            const clumps = Array.from({ length: 6 }, () => [gauss() * R * 0.35, gauss() * R * 0.25, gauss() * R * 0.35]);
+            for (let i = 0; i < 6000; i++) {
+                const c = clumps[Math.floor(Math.random() * clumps.length)];
+                pts.push([c[0] + gauss() * R * 0.25, c[1] + gauss() * R * 0.18, c[2] + gauss() * R * 0.25, pick()]);
+            }
+            if (o.bright) {
+                const g = glow(o.bright, R * 0.8, 0.8);
+                group.add(g);
+            }
+        }
+        group.add(cloud(pts, R * 0.22, { map: SOFT, opacity: 0.3 }));
+        const stars = [];
+        for (let i = 0; i < 120; i++) {
+            stars.push([gauss() * R * 0.5, gauss() * R * 0.4, gauss() * R * 0.5, mix('#ffffff', '#9fc4ff', Math.random())]);
+        }
+        group.add(cloud(stars, R * 0.04));
+        return { object: group, size: R, update: (t) => { group.rotation.y = (o.tilt ? 0 : t * 0.01); } };
+    }
+
+    function darkMatter(o) {
+        const group = new THREE.Group();
+        const gal = spiral({ R: o.R * 0.3, arms: 2, count: 5000, tilt: 0.6 });
+        group.add(gal.object);
+        const pts = [];
+        for (let i = 0; i < 6000; i++) {
+            const v = new THREE.Vector3(gauss(), gauss(), gauss()).normalize().multiplyScalar(Math.abs(gauss()) * o.R * 0.5);
+            pts.push([v.x, v.y, v.z, mix('#7b3cff', '#2a0d6e', Math.random())]);
+        }
+        group.add(cloud(pts, o.R * 0.05, { map: SOFT, opacity: 0.7 }));
+        return { object: group, size: o.R * 0.8, update: gal.update };
+    }
+
+    function expand(o) {
+        const group = new THREE.Group();
+        const pts = [];
+        for (let x = -5; x <= 5; x++) {
+            for (let y = -2; y <= 2; y++) {
+                for (let z = -5; z <= 5; z++) {
+                    pts.push([x * o.R * 0.1 + gauss() * 0.5, y * o.R * 0.1 + gauss() * 0.5, z * o.R * 0.1 + gauss() * 0.5, mix(o.color, '#ffffff', Math.random() * 0.5)]);
+                }
+            }
+        }
+        const p = cloud(pts, o.R * 0.03);
+        group.add(p);
+        if (o.haze) group.add(glow(o.haze, o.R * 1.6, 0.25));
+        return {
+            object: group,
+            size: o.R * 0.9,
+            update: (t) => {
+                const k = (t * 0.12) % 1;
+                p.scale.setScalar(0.6 + k * 0.8);
+                p.material.opacity = k < 0.85 ? 1 : (1 - k) / 0.15;
+            }
+        };
+    }
+
+    function bigBang(o) {
+        const group = new THREE.Group();
+        const pts = [];
+        const v = new THREE.Vector3();
+        for (let i = 0; i < 7000; i++) {
+            v.set(gauss(), gauss(), gauss()).normalize().multiplyScalar(Math.pow(Math.random(), 0.5) * o.R);
+            pts.push([v.x, v.y, v.z, mix('#ffffff', Math.random() < 0.5 ? '#ff7a2a' : '#6f8cff', v.length() / o.R)]);
+        }
+        const p = cloud(pts, o.R * 0.02);
+        group.add(p);
+        group.add(glow('#ffffff', o.R * 0.6));
+        group.add(glow('#ffd28a', o.R * 1.5, 0.4));
+        return {
+            object: group,
+            size: o.R * 0.9,
+            update: (t) => {
+                const k = (t * 0.15) % 1;
+                p.scale.setScalar(0.1 + k);
+                p.material.opacity = 1 - k * 0.7;
+            }
+        };
+    }
+
+    function cmb(o) {
+        const t = tex((g, w, h) => {
+            g.fillStyle = '#7a4a2a';
+            g.fillRect(0, 0, w, h);
+            const cols = ['#c0392b', '#e67e22', '#f1c40f', '#2e86de', '#1b4f9c', '#d35400'];
+            for (let i = 0; i < 1800; i++) {
+                g.fillStyle = cols[Math.floor(Math.random() * cols.length)];
+                g.globalAlpha = 0.5;
+                const r = rand(2, 9);
+                g.beginPath();
+                g.arc(rand(0, w), rand(0, h), r, 0, Math.PI * 2);
+                g.fill();
+            }
+        }, 512, 256);
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(o.R, 48, 32), basic('#ffffff', { map: t }));
+        return { object: mesh, size: o.R * 1.2, update: (time) => { mesh.rotation.y = time * 0.05; } };
+    }
+
+    function craft(o) {
+        const g = new THREE.Group();
+        const metal = lit('#c9ccd1', { metalness: 0.7, roughness: 0.35 });
+        const gold = lit('#d6a54a', { metalness: 0.8, roughness: 0.3 });
+        const panel = lit('#1d3f9e', { metalness: 0.3, roughness: 0.4 });
+        const white = lit('#eeeeee', { metalness: 0.1, roughness: 0.5 });
+        const box = (w, h, d, m, x = 0, y = 0, z = 0) => {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+            b.position.set(x, y, z);
+            g.add(b);
+            return b;
+        };
+        const cyl = (r1, r2, h, m, x = 0, y = 0, z = 0, seg = 24) => {
+            const c = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), m);
+            c.position.set(x, y, z);
+            g.add(c);
+            return c;
+        };
+        const dish = (r, m, x = 0, y = 0, z = 0) => {
+            const d = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 8, 0, Math.PI * 2, 0, 0.6), m);
+            d.material.side = THREE.DoubleSide;
+            d.position.set(x, y, z);
+            g.add(d);
+            return d;
+        };
+        const v = o.variant;
+        if (v === 'sputnik') {
+            g.add(new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), metal));
+            [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([a, b]) => {
+                const ant = cyl(0.015, 0.015, 1.6, metal);
+                ant.position.set(0.35 * a * 0.4, 0.35 * b * 0.4, -0.8);
+                ant.rotation.x = Math.PI / 2 + b * 0.25;
+                ant.rotation.z = a * 0.25;
+            });
+        } else if (v === 'capsule') {
+            g.add(new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), metal));
+            cyl(0.3, 0.4, 0.7, white, 0, -0.6, 0);
+        } else if (v === 'apollo' || v === 'orion') {
+            cyl(0.05, 0.4, 0.45, metal, 0, 0.5, 0);
+            cyl(0.4, 0.4, 0.9, v === 'orion' ? white : metal, 0, -0.2, 0);
+            cyl(0.15, 0.3, 0.3, metal, 0, -0.8, 0);
+            if (v === 'orion') {
+                [0, 1, 2, 3].forEach((i) => {
+                    const p = box(1.2, 0.02, 0.3, panel);
+                    const a = i * Math.PI / 2;
+                    p.position.set(Math.cos(a) * 0.9, -0.3, Math.sin(a) * 0.9);
+                    p.rotation.y = -a;
+                });
+            }
+        } else if (v === 'telescope') {
+            cyl(0.32, 0.32, 1.6, metal);
+            cyl(0.33, 0.33, 0.2, lit('#222222'), 0, 0.85, 0);
+            box(0.03, 1.4, 0.4, panel, 0.75, 0, 0);
+            box(0.03, 1.4, 0.4, panel, -0.75, 0, 0);
+        } else if (v === 'jwst') {
+            const mirror = cyl(0.65, 0.65, 0.05, gold, 0, 0.5, 0, 6);
+            mirror.rotation.x = Math.PI / 2;
+            const shield = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), lit('#b9a7d8', { metalness: 0.9, roughness: 0.2, side: THREE.DoubleSide }));
+            shield.rotation.x = -Math.PI / 2;
+            shield.rotation.z = Math.PI / 4;
+            shield.position.y = -0.2;
+            g.add(shield);
+            box(0.2, 0.3, 0.2, metal, 0, -0.4, 0);
+        } else if (v === 'iss') {
+            box(3, 0.08, 0.08, metal);
+            [-1.3, -0.8, 0.8, 1.3].forEach((x) => {
+                box(0.35, 0.02, 1.4, lit('#c98a2e', { metalness: 0.5 }), x, 0, 0.8);
+                box(0.35, 0.02, 1.4, lit('#c98a2e', { metalness: 0.5 }), x, 0, -0.8);
+            });
+            const m1 = cyl(0.13, 0.13, 1.2, white);
+            m1.rotation.x = Math.PI / 2;
+            const m2 = cyl(0.13, 0.13, 0.8, white);
+            m2.rotation.z = Math.PI / 2;
+            m2.position.y = -0.15;
+        } else if (v === 'probe') {
+            dish(o.dish || 0.6, white, 0, 0.35, 0);
+            box(0.35, 0.25, 0.35, gold, 0, 0.05, 0);
+            const boom = cyl(0.02, 0.02, 1.6, metal, 0.9, 0, 0);
+            boom.rotation.z = Math.PI / 2;
+            if (o.panels) {
+                [0, 1, 2].slice(0, o.panels).forEach((i) => {
+                    const a = i * Math.PI * 2 / o.panels;
+                    const p = box(1.6, 0.02, 0.4, panel);
+                    p.position.set(Math.cos(a) * 1, 0, Math.sin(a) * 1);
+                    p.rotation.y = -a;
+                });
+            }
+            if (o.tall) cyl(0.25, 0.25, 0.9, gold, 0, -0.45, 0);
+        } else if (v === 'rover') {
+            box(0.6, 0.2, 0.4, white, 0, 0.25, 0);
+            [-0.25, 0, 0.25].forEach((x) => [-0.25, 0.25].forEach((z) => {
+                const w = cyl(0.08, 0.08, 0.06, lit('#444444'), x, 0.08, z, 16);
+                w.rotation.x = Math.PI / 2;
+            }));
+            cyl(0.02, 0.02, 0.4, metal, 0.2, 0.55, 0.12);
+            box(0.12, 0.08, 0.08, metal, 0.2, 0.78, 0.12);
+        } else if (v === 'lander') {
+            cyl(0.35, 0.4, 0.4, gold, 0, 0.3, 0, 8);
+            [0, 1, 2, 3].forEach((i) => {
+                const a = i * Math.PI / 2 + Math.PI / 4;
+                const leg = cyl(0.02, 0.02, 0.55, metal);
+                leg.position.set(Math.cos(a) * 0.4, 0.05, Math.sin(a) * 0.4);
+                leg.rotation.z = Math.cos(a) * 0.5;
+                leg.rotation.x = -Math.sin(a) * 0.5;
+            });
+            if (o.panels) box(0.02, 0.4, 0.6, panel, 0.42, 0.35, 0);
+        } else {
+            box(0.5, 0.5, 0.5, gold);
+            if (o.shield) cyl(o.shield, o.shield, 0.05, white, 0, -0.35, 0, 32);
+            if (o.wings !== false) {
+                box(1.6, 0.02, 0.45, panel, 1.05, 0, 0);
+                box(1.6, 0.02, 0.45, panel, -1.05, 0, 0);
+            }
+        }
+        g.scale.setScalar(o.s || 0.4);
+        return { object: g, size: (o.s || 0.4) * 1.6, update: (t) => { g.rotation.y = t * 0.2; } };
+    }
+
+    const BUILDERS = { sphere: sphereBody, rock, comet, belt, shell, star, blackhole, spiral, elliptical, irregular, cluster: galaxyCluster, nebula, darkMatter, expand, bigBang, cmb, craft };
+
+    const LOOKS = {
+        pluto: { kind: 'sphere', r: 1.6, color: '#d9c3a5', spots: '#8a6a4f', heart: true },
+        ceres: { kind: 'sphere', r: 0.9, color: '#8d8a85', spots: '#6f6c68' },
+        eris: { kind: 'sphere', r: 1.6, color: '#ece9e4', spots: '#cfc9c1' },
+        haumea: { kind: 'sphere', r: 1.3, color: '#e9e4dc', spots: '#cfc6b8', scale: [1.6, 0.8, 1], ring: true },
+        makemake: { kind: 'sphere', r: 1.2, color: '#c98f6a', spots: '#a8714f' },
+
+        phobos: { kind: 'rock', r: 0.35, color: '#6e6258', scale: [1.3, 1, 1] },
+        deimos: { kind: 'rock', r: 0.25, color: '#8a7d70' },
+        io: { kind: 'sphere', r: 1.0, color: '#e8d36a', spots: '#c4622d' },
+        europa: { kind: 'sphere', r: 0.9, color: '#e2d8c6', spots: '#cdbfa5', lines: '#a5683f' },
+        ganymede: { kind: 'sphere', r: 1.4, color: '#9c8f80', spots: '#c9bfb2' },
+        callisto: { kind: 'sphere', r: 1.3, color: '#5f5448', spots: '#a39a8f' },
+        titan: { kind: 'sphere', r: 1.4, color: '#d99a3d', spots: '#b97a2a', haze: '#e8a84a' },
+        enceladus: { kind: 'sphere', r: 0.45, color: '#f4f8fb', spots: '#cfe3ef' },
+        triton: { kind: 'sphere', r: 0.8, color: '#d7c2b8', spots: '#a9898a' },
+        charon: { kind: 'sphere', r: 0.85, color: '#9e9a96', spots: '#7f7a76', cap: '#6b3f2e' },
+
+        'asteroid-belt': { kind: 'belt', inner: 108, outer: 130, thick: 2, count: 5000, color: '#a89a88', dot: 0.8 },
+        'kuiper-belt': { kind: 'belt', inner: 295, outer: 385, thick: 8, count: 6000, color: '#9fb3c8', dot: 1.4 },
+        'oort-cloud': { kind: 'shell', inner: 520, outer: 600, count: 4000, color: '#9fc0e0', dot: 2.5 },
+        vesta: { kind: 'rock', r: 0.8, color: '#9a9088' },
+        bennu: { kind: 'rock', r: 0.35, color: '#3d3a37', scale: [1, 0.9, 1] },
+        ryugu: { kind: 'rock', r: 0.4, color: '#4a4440', scale: [1, 0.75, 1] },
+        psyche: { kind: 'rock', r: 0.9, color: '#9a968f', metal: 0.7 },
+        apophis: { kind: 'rock', r: 0.3, color: '#7a6e64', scale: [1.3, 1, 1] },
+        dimorphos: { kind: 'rock', r: 0.5, color: '#6d655d', moonlet: true },
+        halley: { kind: 'comet', r: 0.6, tail: 30, color: '#bfe3ff' },
+        'hale-bopp': { kind: 'comet', r: 1.0, tail: 45, color: '#fff3d6', ionTail: true },
+        'comet-67p': { kind: 'comet', r: 0.5, tail: 16, color: '#d6ecff', lobe: true },
+        oumuamua: { kind: 'rock', r: 0.4, color: '#8a4b33', scale: [3, 0.8, 0.8] },
+        '3i-atlas': { kind: 'comet', r: 0.5, tail: 22, color: '#9fffd0' },
+
+        proxima: { kind: 'star', r: 2.5, color: '#ff5a2a' },
+        'alpha-centauri': { kind: 'star', r: 5, color: '#fff1c4', companion: { r: 4, color: '#ffcf8a', d: 18 } },
+        sirius: { kind: 'star', r: 6, color: '#dfeaff', companion: { r: 0.6, color: '#ffffff', d: 16 } },
+        betelgeuse: { kind: 'star', r: 22, color: '#ff7a3a', glow: 2.6 },
+        rigel: { kind: 'star', r: 9, color: '#a9c8ff' },
+        polaris: { kind: 'star', r: 8, color: '#fff3d0', companion: { r: 2, color: '#ffffff', d: 22 } },
+        vega: { kind: 'star', r: 6, color: '#cfe0ff' },
+        'uy-scuti': { kind: 'star', r: 32, color: '#ff5a1f', glow: 2.4 },
+        'red-dwarf': { kind: 'star', r: 2.5, color: '#ff4a1f' },
+        'white-dwarf': { kind: 'star', r: 0.8, color: '#ffffff', glow: 8 },
+        'neutron-star': { kind: 'star', r: 0.6, color: '#d0f0ff', glow: 10, beams: 22 },
+        supernova: { kind: 'star', r: 2, color: '#fff7d6', glow: 14, explode: 30 },
+
+        'sgr-a': { kind: 'blackhole', r: 5, disk: 5 },
+        'm87-star': { kind: 'blackhole', r: 7, disk: 4.5, jets: 70 },
+        'cygnus-x1': { kind: 'blackhole', r: 2, disk: 4, companion: { r: 5, color: '#a9c8ff', d: 28 }, stream: true },
+        'ton-618': { kind: 'blackhole', r: 9, disk: 5, jets: 90, glowColor: '#ffffff', glowSize: 8, diskColor: '#ffb04a', count: 8000 },
+        'gaia-bh1': { kind: 'blackhole', r: 2.5, disk: 1.6, count: 600, glowColor: '#6f8cff', glowSize: 2.5, companion: { r: 3, color: '#fff1c4', d: 24 } },
+        gw150914: { kind: 'blackhole', r: 3, merger: true },
+
+        'orion-nebula': { kind: 'nebula', R: 50, colors: ['#ff5aa0', '#ff8ac0', '#6fb0ff', '#ffd0e0'], bright: '#ffd8f0' },
+        'crab-nebula': { kind: 'nebula', R: 40, shape: 'remnant', colors: ['#ff7a3a', '#ffb05a', '#ff4a3a', '#ffe08a'] },
+        'eagle-nebula': { kind: 'nebula', R: 50, shape: 'pillars', colors: ['#8a5a3a', '#4fb0a0', '#c0a050'] },
+        'ring-nebula': { kind: 'nebula', R: 30, shape: 'ring', colors: ['#5fd0ff', '#ff5a3a', '#8fffd0'], tilt: 1.2 },
+        'cats-eye-nebula': { kind: 'nebula', R: 26, shape: 'ring', colors: ['#9fc8ff', '#ff7a6a', '#ffffff'], tilt: 0.6 },
+        'helix-nebula': { kind: 'nebula', R: 42, shape: 'ring', colors: ['#6fd0ff', '#ff4a5a', '#9fffe0'], tilt: 0.5 },
+        'carina-nebula': { kind: 'nebula', R: 65, colors: ['#ff9a4a', '#ff6a3a', '#5fa0ff', '#ffd08a', '#c0503a'], bright: '#fff0c0' },
+        'horsehead-nebula': { kind: 'nebula', R: 45, shape: 'dark', colors: ['#ff3a6a', '#ff6a8a', '#c02050'] },
+
+        'milky-way': { kind: 'spiral', R: 80, arms: 4, bar: true, twist: 5, tilt: 0.6 },
+        andromeda: { kind: 'spiral', R: 90, arms: 2, twist: 6, tilt: 1.15, arm: '#a8c8ff' },
+        triangulum: { kind: 'spiral', R: 55, arms: 3, twist: 4, tilt: 0.4, bulge: 0.06, arm: '#9fc0ff' },
+        lmc: { kind: 'irregular', R: 40, nebula: true },
+        smc: { kind: 'irregular', R: 28, clumps: 5 },
+        sombrero: { kind: 'spiral', R: 60, arms: 2, twist: 3, tilt: 1.45, bulge: 0.3, coreGlow: 1.2, dustLane: true, arm: '#ffe0b0' },
+        whirlpool: { kind: 'spiral', R: 65, arms: 2, twist: 7, tilt: 0.3, companion: true },
+        m87: { kind: 'elliptical', R: 80, globulars: true, jet: true },
+        'distant-galaxies': { kind: 'cluster', R: 70, n: 60, blob: 1.2, per: 30, colors: ['#ff6a4a', '#ff9a5a', '#d04a3a'] },
+        'local-group': { kind: 'cluster', R: 100, n: 40, blob: 2, per: 40, colors: ['#ffe0b0', '#9fc0ff', '#ffffff'], flat: 0.4, big: [[-30, 0, 0, 30, '#cfe0ff'], [35, 5, 10, 34, '#ffe6c0'], [10, -4, 25, 16, '#d8e6ff']] },
+
+        'dark-matter': { kind: 'darkMatter', R: 90 },
+        'dark-energy': { kind: 'expand', R: 70, color: '#c08aff', haze: '#7b3cff' },
+        'normal-matter': { kind: 'cluster', R: 50, n: 30, blob: 2, per: 50, colors: ['#ffe0b0', '#ffffff', '#ffb070'] },
+        'big-bang': { kind: 'bigBang', R: 70 },
+        cmb: { kind: 'cmb', R: 40 },
+        'observable-universe': { kind: 'cluster', R: 120, n: 160, blob: 1.5, per: 20, shell: true, colors: ['#ffe0b0', '#9fc0ff', '#ff9a7a'], web: '#5a6fd0', dot: 1.2 },
+        expansion: { kind: 'expand', R: 70, color: '#9fd0ff' },
+
+        'sputnik-1': { kind: 'craft', variant: 'sputnik', s: 0.4 },
+        'vostok-1': { kind: 'craft', variant: 'capsule', s: 0.4 },
+        'apollo-11': { kind: 'craft', variant: 'apollo', s: 0.35 },
+        'voyager-1': { kind: 'craft', variant: 'probe', s: 1.2, dish: 0.7 },
+        'voyager-2': { kind: 'craft', variant: 'probe', s: 1.2, dish: 0.7 },
+        hubble: { kind: 'craft', variant: 'telescope', s: 0.4 },
+        jwst: { kind: 'craft', variant: 'jwst', s: 0.8 },
+        iss: { kind: 'craft', variant: 'iss', s: 0.4 },
+        cassini: { kind: 'craft', variant: 'probe', s: 1.0, dish: 0.8, tall: true },
+        'new-horizons': { kind: 'craft', variant: 'probe', s: 0.8, dish: 0.5 },
+        perseverance: { kind: 'craft', variant: 'rover', s: 0.35 },
+        juno: { kind: 'craft', variant: 'probe', s: 1.0, dish: 0.4, panels: 3 },
+        rosetta: { kind: 'craft', variant: 'satellite', s: 0.4 },
+        parker: { kind: 'craft', variant: 'satellite', s: 1.2, shield: 0.6, wings: false },
+        'chandrayaan-3': { kind: 'craft', variant: 'lander', s: 0.3, panels: true },
+        change: { kind: 'craft', variant: 'lander', s: 0.3 },
+        'artemis-1': { kind: 'craft', variant: 'orion', s: 0.35 },
+        gaia: { kind: 'craft', variant: 'satellite', s: 0.6, shield: 1.4, wings: false },
+        dart: { kind: 'craft', variant: 'satellite', s: 0.3 },
+        euclid: { kind: 'craft', variant: 'satellite', s: 0.6, shield: 0.8, wings: false },
+        'europa-clipper': { kind: 'craft', variant: 'probe', s: 0.6, dish: 0.5, panels: 2 }
+    };
+
+    const PLACES = {
+        pluto: { orbit: 330, angle: 0.4, y: 4 },
+        ceres: { orbit: 120, angle: 0.55 },
+        eris: { orbit: 410, angle: -0.35, y: -12 },
+        haumea: { orbit: 365, angle: -0.05, y: 6 },
+        makemake: { orbit: 385, angle: 0.22, y: -4 },
+
+        phobos: { near: 'mars', dist: 5, angle: 0.8 },
+        deimos: { near: 'mars', dist: 8, angle: 3.3 },
+        io: { near: 'jupiter', dist: 17, angle: 0.3 },
+        europa: { near: 'jupiter', dist: 21, angle: 1.9 },
+        ganymede: { near: 'jupiter', dist: 26, angle: 3.5 },
+        callisto: { near: 'jupiter', dist: 32, angle: 5.0 },
+        titan: { near: 'saturn', dist: 30, angle: 1.2 },
+        enceladus: { near: 'saturn', dist: 24, angle: 3.8 },
+        triton: { near: 'neptune', dist: 11, angle: 2.2 },
+        charon: { near: 'pluto', dist: 5, angle: 1.0 },
+
+        'asteroid-belt': { region: true },
+        'kuiper-belt': { region: true },
+        'oort-cloud': { region: true },
+        vesta: { orbit: 118, angle: 0.1, y: 1 },
+        bennu: { orbit: 86, angle: 0.25, y: 2 },
+        ryugu: { orbit: 90, angle: -0.45, y: -2 },
+        psyche: { orbit: 125, angle: -0.3, y: 1 },
+        apophis: { orbit: 78, angle: 0.15, y: 3 },
+        dimorphos: { orbit: 92, angle: 0.6, y: -2 },
+        halley: { orbit: 160, angle: 0.7, y: 25 },
+        'hale-bopp': { orbit: 220, angle: -0.6, y: -30 },
+        'comet-67p': { orbit: 130, angle: 0.85, y: 10 },
+        oumuamua: { orbit: 450, angle: 0.9, y: 60 },
+        '3i-atlas': { orbit: 470, angle: -0.9, y: -50 },
+
+        'sputnik-1': { near: 'earth', dist: 6, angle: 0.0, y: 2 },
+        'vostok-1': { near: 'earth', dist: 6.5, angle: 1.2, y: -1.5 },
+        iss: { near: 'earth', dist: 5.5, angle: 2.4, y: 1 },
+        hubble: { near: 'earth', dist: 6, angle: 3.6, y: -1 },
+        jwst: { near: 'earth', l2: 0 },
+        gaia: { near: 'earth', l2: 1 },
+        euclid: { near: 'earth', l2: -1 },
+        'apollo-11': { near: 'moon', dist: 2.2, angle: 0.5, y: 0.5 },
+        'chandrayaan-3': { near: 'moon', dist: 2.2, angle: 2.5, y: -0.5 },
+        change: { near: 'moon', dist: 2.2, angle: 4.2, y: 0.4 },
+        'artemis-1': { near: 'moon', dist: 3, angle: 5.5, y: 1 },
+        perseverance: { near: 'mars', dist: 0, angle: 0, y: 2.85 },
+        juno: { near: 'jupiter', dist: 14, angle: 1, y: 6 },
+        cassini: { near: 'saturn', dist: 26, angle: 2.4, y: 6 },
+        'europa-clipper': { near: 'europa', dist: 3, angle: 1 },
+        'new-horizons': { orbit: 345, angle: 0.36, y: 4 },
+        'voyager-1': { orbit: 520, angle: 0.25, y: 90 },
+        'voyager-2': { orbit: 505, angle: -0.35, y: -70 },
+        parker: { near: 'sun', dist: 26, angle: 2, y: 4 },
+        rosetta: { near: 'comet-67p', dist: 3, angle: 1.5 },
+        dart: { near: 'dimorphos', dist: 2.5, angle: 0.5 }
+    };
+
+    return {
+        has(id) {
+            return !!LOOKS[id];
+        },
+        placeOf(id) {
+            return PLACES[id] || { deep: true };
+        },
+        build(id, ctx) {
+            const look = LOOKS[id];
+            if (!look) return null;
+            return BUILDERS[look.kind](look, ctx || { away: new THREE.Vector3(1, 0, 0) });
+        }
+    };
+})();
