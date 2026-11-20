@@ -1,0 +1,752 @@
+const SPACE_CATEGORIES = [
+    { id: 'solar-system', name: 'Sun & Planets', icon: '🪐' },
+    { id: 'dwarf-planets', name: 'Dwarf Planets', icon: '⚪' },
+    { id: 'moons', name: 'Moons', icon: '🌙' },
+    { id: 'small-bodies', name: 'Asteroids & Comets', icon: '☄️' },
+    { id: 'stars', name: 'Stars', icon: '⭐' },
+    { id: 'black-holes', name: 'Black Holes', icon: '🕳️' },
+    { id: 'nebulae', name: 'Nebulae', icon: '☁️' },
+    { id: 'galaxies', name: 'Galaxies', icon: '🌌' },
+    { id: 'dark-universe', name: 'Dark Matter & Cosmology', icon: '🌑' },
+    { id: 'missions', name: 'Space Missions', icon: '🚀' }
+];
+
+const SPACE_ITEMS = [
+    {
+        id: 'sun', cat: 'solar-system', name: 'The Sun', type: 'G-type main-sequence star',
+        summary: 'The star at the center of our Solar System. It holds about 99.8% of all the mass in the Solar System.',
+        stats: { 'Diameter': '1.39 million km (109 Earths)', 'Age': '≈4.6 billion years', 'Surface temperature': '≈5,500 °C', 'Core temperature': '≈15 million °C', 'Light to Earth': '≈8 min 20 s' },
+        facts: ['About 1.3 million Earths could fit inside the Sun.', 'Every second it turns about 4 million tonnes of matter into energy through nuclear fusion.', 'In about 5 billion years it will swell into a red giant, then shrink into a white dwarf.']
+    },
+    {
+        id: 'mercury', cat: 'solar-system', name: 'Mercury', type: 'Terrestrial planet',
+        summary: 'The smallest planet and the closest to the Sun.',
+        stats: { 'Diameter': '4,879 km', 'Distance from Sun': '57.9 million km (0.39 AU)', 'Day (sunrise to sunrise)': '176 Earth days', 'Year': '88 Earth days', 'Moons': '0', 'Temperature': '−173 °C to 427 °C' },
+        facts: ['One full day–night cycle on Mercury lasts two of its years.', 'It is not the hottest planet: with no atmosphere to trap heat, its nights are freezing.', 'NASA’s MESSENGER found water ice hidden in permanently shadowed craters at its poles.']
+    },
+    {
+        id: 'venus', cat: 'solar-system', name: 'Venus', type: 'Terrestrial planet',
+        summary: 'The hottest planet, wrapped in thick clouds of sulfuric acid over a carbon dioxide atmosphere.',
+        stats: { 'Diameter': '12,104 km', 'Distance from Sun': '108.2 million km (0.72 AU)', 'Rotation': '243 Earth days (backwards)', 'Year': '225 Earth days', 'Moons': '0', 'Surface temperature': '≈465 °C' },
+        facts: ['A runaway greenhouse effect makes it hotter than Mercury.', 'It spins backwards, so the Sun rises in the west.', 'Surface pressure is about 92 times Earth’s, like being 900 m under the ocean.', 'The Soviet Venera 7 made the first soft landing on another planet here in 1970.']
+    },
+    {
+        id: 'earth', cat: 'solar-system', name: 'Earth', type: 'Terrestrial planet',
+        summary: 'Our home and the only place known to have life.',
+        stats: { 'Diameter': '12,742 km', 'Distance from Sun': '149.6 million km (1 AU)', 'Rotation': '23 h 56 min', 'Year': '365.25 days', 'Moons': '1', 'Average temperature': '≈15 °C' },
+        facts: ['About 71% of the surface is covered by water.', 'Its magnetic field shields life from the solar wind.', 'It is the densest planet in the Solar System.']
+    },
+    {
+        id: 'mars', cat: 'solar-system', name: 'Mars', type: 'Terrestrial planet',
+        summary: 'The Red Planet, a cold desert world that once had rivers and lakes.',
+        stats: { 'Diameter': '6,779 km', 'Distance from Sun': '227.9 million km (1.52 AU)', 'Rotation': '24 h 37 min', 'Year': '687 Earth days', 'Moons': '2 (Phobos, Deimos)', 'Average temperature': '≈ −65 °C' },
+        facts: ['Olympus Mons is about 22 km tall, roughly 2.5 times the height of Everest.', 'Valles Marineris is a canyon about 4,000 km long.', 'Its red color comes from iron oxide (rust) in the dust.']
+    },
+    {
+        id: 'jupiter', cat: 'solar-system', name: 'Jupiter', type: 'Gas giant',
+        summary: 'The largest planet, with more than twice the mass of all other planets combined.',
+        stats: { 'Diameter': '139,820 km', 'Distance from Sun': '778.5 million km (5.2 AU)', 'Rotation': '9 h 56 min', 'Year': '11.9 Earth years', 'Moons': '95+', 'Cloud-top temperature': '≈ −110 °C' },
+        facts: ['The Great Red Spot is a storm larger than Earth that has lasted for centuries.', 'It has the shortest day of any planet.', 'It has faint rings, discovered by Voyager 1 in 1979.']
+    },
+    {
+        id: 'saturn', cat: 'solar-system', name: 'Saturn', type: 'Gas giant',
+        summary: 'The ringed planet, with the most spectacular ring system in the Solar System.',
+        stats: { 'Diameter': '116,460 km', 'Distance from Sun': '1.43 billion km (9.5 AU)', 'Rotation': '10 h 33 min', 'Year': '29.4 Earth years', 'Moons': '274 (as of 2025)', 'Cloud-top temperature': '≈ −140 °C' },
+        facts: ['Its average density is lower than water.', 'The main rings span about 280,000 km but are often only about 10 m thick.', 'A six-sided storm called the hexagon swirls around its north pole.']
+    },
+    {
+        id: 'uranus', cat: 'solar-system', name: 'Uranus', type: 'Ice giant',
+        summary: 'An ice giant that rolls around the Sun on its side.',
+        stats: { 'Diameter': '50,724 km', 'Distance from Sun': '2.87 billion km (19.2 AU)', 'Rotation': '17 h 14 min (backwards)', 'Year': '84 Earth years', 'Moons': '28+', 'Coldest temperature': '≈ −224 °C' },
+        facts: ['Its axis is tilted about 98°, so each pole gets about 42 years of sunlight, then 42 years of darkness.', 'It was the first planet discovered with a telescope, by William Herschel in 1781.', 'Only one spacecraft has visited it: Voyager 2 in 1986.']
+    },
+    {
+        id: 'neptune', cat: 'solar-system', name: 'Neptune', type: 'Ice giant',
+        summary: 'The farthest planet from the Sun, a deep blue world with the fastest winds in the Solar System.',
+        stats: { 'Diameter': '49,244 km', 'Distance from Sun': '4.5 billion km (30.1 AU)', 'Rotation': '16 h 6 min', 'Year': '165 Earth years', 'Moons': '16', 'Average temperature': '≈ −214 °C' },
+        facts: ['Winds reach about 2,100 km/h.', 'It was found in 1846 by mathematical prediction before anyone saw it.', 'It completed its first full orbit since discovery in 2011.']
+    },
+
+    {
+        id: 'pluto', cat: 'dwarf-planets', name: 'Pluto', type: 'Dwarf planet (Kuiper Belt)',
+        summary: 'Once the ninth planet, reclassified as a dwarf planet in 2006.',
+        stats: { 'Diameter': '2,377 km', 'Distance from Sun': '≈5.9 billion km (39.5 AU avg)', 'Day': '6.4 Earth days', 'Year': '248 Earth years', 'Moons': '5', 'Temperature': '≈ −230 °C' },
+        facts: ['New Horizons flew past it on July 14, 2015.', 'It has a giant heart-shaped plain of nitrogen ice called Tombaugh Regio.', 'It is smaller than Earth’s Moon.']
+    },
+    {
+        id: 'ceres', cat: 'dwarf-planets', name: 'Ceres', type: 'Dwarf planet (asteroid belt)',
+        summary: 'The largest object in the asteroid belt and the only dwarf planet in the inner Solar System.',
+        stats: { 'Diameter': '≈940 km', 'Distance from Sun': '≈413 million km (2.8 AU)', 'Day': '9 h', 'Year': '4.6 Earth years', 'Moons': '0' },
+        facts: ['Discovered in 1801 by Giuseppe Piazzi, it was the first asteroid ever found.', 'The bright spots in Occator crater are salt deposits.', 'NASA’s Dawn orbited it from 2015 to 2018.']
+    },
+    {
+        id: 'eris', cat: 'dwarf-planets', name: 'Eris', type: 'Dwarf planet (scattered disc)',
+        summary: 'A distant dwarf planet whose discovery led to Pluto’s reclassification.',
+        stats: { 'Diameter': '2,326 km', 'Distance from Sun': '≈68 AU avg', 'Year': '557 Earth years', 'Moons': '1 (Dysnomia)' },
+        facts: ['It is slightly smaller than Pluto but about 27% more massive.', 'Its discovery in 2005 pushed astronomers to define “planet” in 2006.', 'It is named after the Greek goddess of discord.']
+    },
+    {
+        id: 'haumea', cat: 'dwarf-planets', name: 'Haumea', type: 'Dwarf planet (Kuiper Belt)',
+        summary: 'An egg-shaped dwarf planet that spins extremely fast.',
+        stats: { 'Size': '≈2,100 km long', 'Day': '≈3.9 h', 'Year': '284 Earth years', 'Moons': '2' },
+        facts: ['Its fast spin stretched it into an oval shape.', 'A ring was discovered around it in 2017.']
+    },
+    {
+        id: 'makemake', cat: 'dwarf-planets', name: 'Makemake', type: 'Dwarf planet (Kuiper Belt)',
+        summary: 'One of the brightest objects in the Kuiper Belt.',
+        stats: { 'Diameter': '≈1,430 km', 'Year': '305 Earth years', 'Moons': '1' },
+        facts: ['Discovered shortly after Easter in 2005.', 'It is named after the creator god of the Rapa Nui people of Easter Island.']
+    },
+
+    {
+        id: 'moon', cat: 'moons', name: 'The Moon', type: 'Moon of Earth',
+        summary: 'Earth’s only natural satellite and the only other world humans have walked on.',
+        stats: { 'Diameter': '3,475 km', 'Distance from Earth': '384,400 km avg', 'Orbit': '27.3 days' },
+        facts: ['It always shows the same face to Earth because it is tidally locked.', 'It moves about 3.8 cm farther from Earth every year.', '12 astronauts walked on it between 1969 and 1972.', 'It probably formed from debris after a giant impact with the young Earth.']
+    },
+    {
+        id: 'phobos', cat: 'moons', name: 'Phobos', type: 'Moon of Mars',
+        summary: 'The larger of Mars’ two small, potato-shaped moons.',
+        stats: { 'Size': '≈22 km', 'Orbit': '7 h 39 min', 'Discovered': '1877, Asaph Hall' },
+        facts: ['It orbits faster than Mars spins, so it rises in the west and sets in the east.', 'It is slowly spiraling inward and will break apart in tens of millions of years.']
+    },
+    {
+        id: 'deimos', cat: 'moons', name: 'Deimos', type: 'Moon of Mars',
+        summary: 'Mars’ smaller and more distant moon.',
+        stats: { 'Size': '≈12 km', 'Orbit': '30.3 h', 'Discovered': '1877, Asaph Hall' },
+        facts: ['From Mars it looks like a bright star.', 'It may be a captured asteroid or debris from an ancient impact.']
+    },
+    {
+        id: 'io', cat: 'moons', name: 'Io', type: 'Moon of Jupiter',
+        summary: 'The most volcanically active world in the Solar System.',
+        stats: { 'Diameter': '3,643 km', 'Orbit': '1.77 days', 'Discovered': '1610, Galileo' },
+        facts: ['It has over 400 active volcanoes.', 'Jupiter’s gravity squeezes it constantly, heating its interior.']
+    },
+    {
+        id: 'europa', cat: 'moons', name: 'Europa', type: 'Moon of Jupiter',
+        summary: 'An icy moon hiding a global saltwater ocean, one of the best places to search for life.',
+        stats: { 'Diameter': '3,122 km', 'Orbit': '3.55 days', 'Discovered': '1610, Galileo' },
+        facts: ['Its hidden ocean may hold about twice as much water as all of Earth’s oceans.', 'NASA’s Europa Clipper launched in October 2024 and is due to arrive in 2030.']
+    },
+    {
+        id: 'ganymede', cat: 'moons', name: 'Ganymede', type: 'Moon of Jupiter',
+        summary: 'The largest moon in the Solar System.',
+        stats: { 'Diameter': '5,268 km', 'Orbit': '7.15 days', 'Discovered': '1610, Galileo' },
+        facts: ['It is bigger than the planet Mercury.', 'It is the only moon known to have its own magnetic field.', 'ESA’s JUICE mission is planned to orbit it in 2034.']
+    },
+    {
+        id: 'callisto', cat: 'moons', name: 'Callisto', type: 'Moon of Jupiter',
+        summary: 'One of the most heavily cratered objects in the Solar System.',
+        stats: { 'Diameter': '4,821 km', 'Orbit': '16.7 days', 'Discovered': '1610, Galileo' },
+        facts: ['Its surface is about 4 billion years old and barely changed.', 'It may also have an ocean deep below its ice.']
+    },
+    {
+        id: 'titan', cat: 'moons', name: 'Titan', type: 'Moon of Saturn',
+        summary: 'Saturn’s largest moon, with a thick atmosphere and lakes of liquid methane.',
+        stats: { 'Diameter': '5,150 km', 'Orbit': '15.9 days', 'Discovered': '1655, Christiaan Huygens' },
+        facts: ['Its atmosphere is thicker than Earth’s.', 'It rains liquid methane and ethane into rivers and lakes.', 'ESA’s Huygens probe landed there in 2005, the most distant landing ever.', 'NASA’s Dragonfly rotorcraft is planned to launch in 2028.']
+    },
+    {
+        id: 'enceladus', cat: 'moons', name: 'Enceladus', type: 'Moon of Saturn',
+        summary: 'A small icy moon that sprays water into space from a hidden ocean.',
+        stats: { 'Diameter': '504 km', 'Orbit': '1.37 days', 'Discovered': '1789, William Herschel' },
+        facts: ['Geysers at its south pole feed Saturn’s E ring.', 'Cassini found salts and organic molecules in its spray.', 'It is one of the most reflective objects in the Solar System.']
+    },
+    {
+        id: 'triton', cat: 'moons', name: 'Triton', type: 'Moon of Neptune',
+        summary: 'Neptune’s largest moon, which orbits backwards.',
+        stats: { 'Diameter': '2,707 km', 'Orbit': '5.9 days (backwards)', 'Discovered': '1846, William Lassell' },
+        facts: ['Its backward orbit suggests it was captured from the Kuiper Belt.', 'Voyager 2 saw nitrogen geysers erupting from its surface.']
+    },
+    {
+        id: 'charon', cat: 'moons', name: 'Charon', type: 'Moon of Pluto',
+        summary: 'Pluto’s largest moon, about half Pluto’s size.',
+        stats: { 'Diameter': '1,212 km', 'Orbit': '6.4 days', 'Discovered': '1978, James Christy' },
+        facts: ['Pluto and Charon are tidally locked to each other and always show the same faces.', 'It has a reddish north polar cap nicknamed Mordor Macula.']
+    },
+
+    {
+        id: 'asteroid-belt', cat: 'small-bodies', name: 'Asteroid Belt', type: 'Region',
+        summary: 'A ring of rocky bodies between Mars and Jupiter.',
+        stats: { 'Location': '≈2.2–3.2 AU from the Sun', 'Total mass': '≈3% of the Moon' },
+        facts: ['Despite movies, asteroids there are usually hundreds of thousands of km apart.', 'Ceres, Vesta, Pallas and Hygiea hold about half of its mass.']
+    },
+    {
+        id: 'kuiper-belt', cat: 'small-bodies', name: 'Kuiper Belt', type: 'Region',
+        summary: 'A wide icy region beyond Neptune, home to Pluto and countless frozen objects.',
+        stats: { 'Location': '≈30–50 AU from the Sun' },
+        facts: ['It is the source of many short-period comets.', 'New Horizons visited the Kuiper Belt object Arrokoth on January 1, 2019.']
+    },
+    {
+        id: 'oort-cloud', cat: 'small-bodies', name: 'Oort Cloud', type: 'Region (theorized)',
+        summary: 'A giant shell of icy bodies thought to surround the Solar System.',
+        stats: { 'Location': '≈2,000 to 100,000+ AU from the Sun' },
+        facts: ['It has never been observed directly.', 'It is thought to be the source of long-period comets.']
+    },
+    {
+        id: 'vesta', cat: 'small-bodies', name: 'Vesta', type: 'Asteroid',
+        summary: 'The brightest asteroid and the second-largest object in the asteroid belt.',
+        stats: { 'Diameter': '≈525 km', 'Discovered': '1807, Heinrich Olbers' },
+        facts: ['It is sometimes visible to the naked eye.', 'Its giant Rheasilvia crater has a central peak about 22 km high.', 'NASA’s Dawn orbited it in 2011–2012.']
+    },
+    {
+        id: 'bennu', cat: 'small-bodies', name: 'Bennu', type: 'Near-Earth asteroid',
+        summary: 'A small carbon-rich asteroid sampled by NASA’s OSIRIS-REx.',
+        stats: { 'Diameter': '≈490 m', 'Sample returned': 'September 24, 2023' },
+        facts: ['OSIRIS-REx brought back about 121 g of material.', 'The samples contain amino acids and all five nucleobases used in DNA and RNA.']
+    },
+    {
+        id: 'ryugu', cat: 'small-bodies', name: 'Ryugu', type: 'Near-Earth asteroid',
+        summary: 'A spinning-top-shaped asteroid sampled by Japan’s Hayabusa2.',
+        stats: { 'Diameter': '≈900 m', 'Sample returned': 'December 2020' },
+        facts: ['It is a “rubble pile” of loosely held rocks.', 'Hayabusa2 returned about 5.4 g of samples to Earth.']
+    },
+    {
+        id: 'psyche', cat: 'small-bodies', name: 'Psyche', type: 'Metal-rich asteroid',
+        summary: 'An unusual asteroid that may be the exposed core of an early planet.',
+        stats: { 'Size': '≈220 km', 'Mission': 'NASA Psyche (launched Oct 2023)' },
+        facts: ['The Psyche spacecraft is expected to arrive in 2029.']
+    },
+    {
+        id: 'apophis', cat: 'small-bodies', name: 'Apophis', type: 'Near-Earth asteroid',
+        summary: 'An asteroid that will pass extremely close to Earth in 2029.',
+        stats: { 'Diameter': '≈340 m', 'Close approach': 'April 13, 2029' },
+        facts: ['It will pass about 32,000 km from Earth, closer than some satellites.', 'It should be visible to the naked eye during the flyby.', 'Scientists have ruled out an impact for at least the next 100 years.']
+    },
+    {
+        id: 'dimorphos', cat: 'small-bodies', name: 'Dimorphos', type: 'Asteroid moonlet',
+        summary: 'The small asteroid NASA deliberately crashed into to test planetary defense.',
+        stats: { 'Size': '≈160 m', 'Orbits': 'Asteroid Didymos', 'Impact': 'September 26, 2022 (DART)' },
+        facts: ['The DART impact shortened its orbit by about 32 minutes.', 'ESA’s Hera mission launched in 2024 to study the aftermath.']
+    },
+    {
+        id: 'halley', cat: 'small-bodies', name: 'Halley’s Comet', type: 'Periodic comet',
+        summary: 'The most famous comet, visible from Earth about every 76 years.',
+        stats: { 'Nucleus': '≈15 × 8 km', 'Period': '≈76 years', 'Last visit': '1986', 'Next visit': '2061' },
+        facts: ['ESA’s Giotto flew close to its nucleus in 1986.', 'Its dust causes the Orionid and Eta Aquariid meteor showers.']
+    },
+    {
+        id: 'hale-bopp', cat: 'small-bodies', name: 'Comet Hale–Bopp', type: 'Long-period comet',
+        summary: 'One of the brightest and most widely seen comets of the 20th century.',
+        stats: { 'Nucleus': '≈60 km', 'Visible': '1996–1997' },
+        facts: ['It stayed visible to the naked eye for a record of about 18 months.']
+    },
+    {
+        id: 'comet-67p', cat: 'small-bodies', name: 'Comet 67P/Churyumov–Gerasimenko', type: 'Periodic comet',
+        summary: 'The first comet orbited by a spacecraft and landed on.',
+        stats: { 'Size': '≈4 km', 'Visited by': 'Rosetta and Philae (ESA)' },
+        facts: ['Its two-lobed shape looks like a rubber duck.', 'The Philae lander touched down on November 12, 2014.']
+    },
+    {
+        id: 'oumuamua', cat: 'small-bodies', name: '‘Oumuamua', type: 'Interstellar object',
+        summary: 'The first object ever seen passing through our Solar System from another star system.',
+        stats: { 'Discovered': 'October 2017', 'Telescope': 'Pan-STARRS, Hawaii' },
+        facts: ['Its name is Hawaiian for a messenger from afar arriving first.', 'It was very elongated and sped up slightly as it left.']
+    },
+    {
+        id: '3i-atlas', cat: 'small-bodies', name: '3I/ATLAS', type: 'Interstellar comet',
+        summary: 'The third interstellar object ever found, after ‘Oumuamua and 2I/Borisov.',
+        stats: { 'Discovered': 'July 2025', 'Survey': 'ATLAS' },
+        facts: ['It came from outside the Solar System and is just passing through.']
+    },
+
+    {
+        id: 'proxima', cat: 'stars', name: 'Proxima Centauri', type: 'Red dwarf',
+        summary: 'The closest star to the Sun.',
+        stats: { 'Distance': '4.24 light-years', 'Size': '≈15% of the Sun' },
+        facts: ['Its light takes over 4 years to reach us.', 'Its planet Proxima b orbits in the zone where liquid water could exist.', 'It often releases powerful flares.']
+    },
+    {
+        id: 'alpha-centauri', cat: 'stars', name: 'Alpha Centauri A', type: 'G-type star (Sun-like)',
+        summary: 'The brightest member of the nearest star system to us.',
+        stats: { 'Distance': '4.37 light-years', 'Mass': '≈1.1 Suns' },
+        facts: ['It orbits with Alpha Centauri B, and Proxima Centauri belongs to the same system.', 'Together they look like the third-brightest star in the night sky.']
+    },
+    {
+        id: 'sirius', cat: 'stars', name: 'Sirius', type: 'A-type main-sequence star',
+        summary: 'The brightest star in the night sky.',
+        stats: { 'Distance': '8.6 light-years', 'Mass': '≈2 Suns', 'Brightness': '≈25× the Sun' },
+        facts: ['It has a white dwarf companion called Sirius B.', 'It is nicknamed the Dog Star.']
+    },
+    {
+        id: 'betelgeuse', cat: 'stars', name: 'Betelgeuse', type: 'Red supergiant',
+        summary: 'A huge, dying star in Orion’s shoulder.',
+        stats: { 'Distance': '≈550–700 light-years', 'Size': 'Hundreds of times wider than the Sun' },
+        facts: ['It dimmed dramatically in 2019–2020 because of a dust cloud.', 'It is expected to explode as a supernova within about 100,000 years, bright enough to see in daylight.']
+    },
+    {
+        id: 'rigel', cat: 'stars', name: 'Rigel', type: 'Blue supergiant',
+        summary: 'A brilliant blue-white star at Orion’s foot.',
+        stats: { 'Distance': '≈860 light-years', 'Brightness': 'Tens of thousands of times the Sun' },
+        facts: ['It is usually the brightest star in Orion.']
+    },
+    {
+        id: 'polaris', cat: 'stars', name: 'Polaris', type: 'Yellow supergiant',
+        summary: 'The North Star, sitting almost exactly above Earth’s North Pole.',
+        stats: { 'Distance': '≈430 light-years' },
+        facts: ['It barely moves in the sky, which made it vital for navigation.', 'It is not the brightest star; about 47 stars look brighter.', 'It is actually a triple star system.']
+    },
+    {
+        id: 'vega', cat: 'stars', name: 'Vega', type: 'A-type main-sequence star',
+        summary: 'One of the brightest stars, used as a reference for measuring star brightness.',
+        stats: { 'Distance': '25 light-years' },
+        facts: ['Because Earth’s axis wobbles, Vega was the North Star about 14,000 years ago and will be again.', 'It was the first star other than the Sun to be photographed, in 1850.']
+    },
+    {
+        id: 'uy-scuti', cat: 'stars', name: 'UY Scuti', type: 'Red supergiant',
+        summary: 'One of the largest known stars.',
+        stats: { 'Distance': '≈9,500 light-years', 'Radius': '≈1,700 Suns (estimate)' },
+        facts: ['Placed where the Sun is, it would extend past the orbit of Jupiter.', 'Size estimates for giant stars like this are uncertain.']
+    },
+    {
+        id: 'red-dwarf', cat: 'stars', name: 'Red Dwarfs', type: 'Star type',
+        summary: 'Small, cool, dim stars — the most common stars in the galaxy.',
+        stats: { 'Share of stars': '≈75% of Milky Way stars', 'Lifespan': 'Trillions of years' },
+        facts: ['None are visible to the naked eye from Earth.', 'They burn fuel so slowly that none has ever died yet.']
+    },
+    {
+        id: 'white-dwarf', cat: 'stars', name: 'White Dwarfs', type: 'Stellar remnant',
+        summary: 'The hot, Earth-sized core left behind when a Sun-like star dies.',
+        stats: { 'Size': 'About the size of Earth', 'Mass': 'Up to ≈1.4 Suns' },
+        facts: ['A teaspoon of white dwarf material would weigh several tonnes.', 'Our Sun will become one.']
+    },
+    {
+        id: 'neutron-star', cat: 'stars', name: 'Neutron Stars & Pulsars', type: 'Stellar remnant',
+        summary: 'Ultra-dense cores left after massive stars explode.',
+        stats: { 'Size': '≈20 km across', 'Mass': '≈1.4–2 Suns' },
+        facts: ['A teaspoon would weigh about a billion tonnes.', 'Pulsars are spinning neutron stars; the fastest spin over 700 times per second.', 'The first pulsar was discovered by Jocelyn Bell Burnell in 1967.']
+    },
+    {
+        id: 'supernova', cat: 'stars', name: 'Supernovae', type: 'Stellar explosion',
+        summary: 'The explosive deaths of massive stars, briefly outshining whole galaxies.',
+        stats: { 'Last seen in Milky Way': '1604 (Kepler’s Supernova)', 'Nearest modern one': 'SN 1987A (Large Magellanic Cloud)' },
+        facts: ['Many heavy elements in your body were made in exploding stars.']
+    },
+
+    {
+        id: 'black-hole-basics', cat: 'black-holes', name: 'How Black Holes Work', type: 'Guide (the black hole in this program)',
+        summary: 'A black hole is a region where gravity is so strong that not even light can escape. The black hole at the center of this program shows its main parts.',
+        stats: { 'Event horizon': 'The point of no return (the black sphere)', 'Accretion disk': 'Hot gas spiraling in (the glowing streaks)', 'Photon ring': 'Light bent around the hole (the orange glow)' },
+        facts: ['In this program, one side of the disk looks brighter: real disks do this too, because gas moving toward us is boosted (Doppler beaming).', 'Inner gas is hotter, so it glows white; outer gas is cooler and redder — just like the colors here.', 'Falling in would stretch you like spaghetti, called “spaghettification”.']
+    },
+    {
+        id: 'sgr-a', cat: 'black-holes', name: 'Sagittarius A*', type: 'Supermassive black hole',
+        summary: 'The giant black hole at the center of our Milky Way.',
+        stats: { 'Mass': '≈4 million Suns', 'Distance': '≈26,000 light-years' },
+        facts: ['The Event Horizon Telescope released its first image in May 2022.', 'Tracking stars orbiting it earned the 2020 Nobel Prize in Physics.']
+    },
+    {
+        id: 'm87-star', cat: 'black-holes', name: 'M87*', type: 'Supermassive black hole',
+        summary: 'The first black hole ever photographed.',
+        stats: { 'Mass': '≈6.5 billion Suns', 'Distance': '≈55 million light-years' },
+        facts: ['Its image was revealed on April 10, 2019.', 'It shoots a jet of particles thousands of light-years long.']
+    },
+    {
+        id: 'cygnus-x1', cat: 'black-holes', name: 'Cygnus X-1', type: 'Stellar-mass black hole',
+        summary: 'The first object widely accepted as a black hole.',
+        stats: { 'Mass': '≈21 Suns', 'Distance': '≈7,200 light-years' },
+        facts: ['Stephen Hawking bet that it was not a black hole, and later admitted he lost.']
+    },
+    {
+        id: 'ton-618', cat: 'black-holes', name: 'TON 618', type: 'Ultramassive black hole (quasar)',
+        summary: 'One of the most massive black holes known.',
+        stats: { 'Mass': 'Tens of billions of Suns', 'Light travel time': '≈10.8 billion years' },
+        facts: ['It powers a quasar, one of the brightest objects in the universe.']
+    },
+    {
+        id: 'gaia-bh1', cat: 'black-holes', name: 'Gaia BH1', type: 'Dormant stellar black hole',
+        summary: 'The nearest known black hole to Earth.',
+        stats: { 'Mass': '≈10 Suns', 'Distance': '≈1,560 light-years', 'Found': '2022' },
+        facts: ['It was found by watching a Sun-like star wobble around it.', 'Gaia BH3, found in 2024, is the most massive stellar black hole known in our galaxy at about 33 Suns.']
+    },
+    {
+        id: 'gw150914', cat: 'black-holes', name: 'GW150914', type: 'Black hole merger',
+        summary: 'The first gravitational waves ever detected, from two colliding black holes.',
+        stats: { 'Detected': 'September 14, 2015 (LIGO)', 'Black holes': '≈36 + 29 Suns', 'Distance': '≈1.3 billion light-years' },
+        facts: ['About 3 Suns’ worth of mass turned into gravitational waves in a fraction of a second.', 'The discovery won the 2017 Nobel Prize in Physics.']
+    },
+
+    {
+        id: 'orion-nebula', cat: 'nebulae', name: 'Orion Nebula (M42)', type: 'Emission nebula',
+        summary: 'A glowing star nursery visible to the naked eye in Orion’s sword.',
+        stats: { 'Distance': '≈1,344 light-years', 'Constellation': 'Orion' },
+        facts: ['It is the closest large star-forming region to Earth.', 'Young stars in the Trapezium cluster light it up.']
+    },
+    {
+        id: 'crab-nebula', cat: 'nebulae', name: 'Crab Nebula (M1)', type: 'Supernova remnant',
+        summary: 'The remains of a star that exploded in the year 1054.',
+        stats: { 'Distance': '≈6,500 light-years', 'Constellation': 'Taurus' },
+        facts: ['Chinese astronomers recorded the explosion; it was visible in daylight for weeks.', 'A pulsar at its center spins about 30 times per second.']
+    },
+    {
+        id: 'eagle-nebula', cat: 'nebulae', name: 'Eagle Nebula (M16)', type: 'Emission nebula',
+        summary: 'Home of the famous Pillars of Creation.',
+        stats: { 'Distance': '≈6,500 light-years', 'Constellation': 'Serpens' },
+        facts: ['Hubble photographed the Pillars in 1995; JWST photographed them again in 2022.', 'The pillars are several light-years tall.']
+    },
+    {
+        id: 'ring-nebula', cat: 'nebulae', name: 'Ring Nebula (M57)', type: 'Planetary nebula',
+        summary: 'A glowing shell of gas thrown off by a dying Sun-like star.',
+        stats: { 'Distance': '≈2,300 light-years', 'Constellation': 'Lyra' },
+        facts: ['“Planetary nebula” is a misleading old name — they have nothing to do with planets.', 'A white dwarf sits at its center.']
+    },
+    {
+        id: 'cats-eye-nebula', cat: 'nebulae', name: 'Cat’s Eye Nebula (NGC 6543)', type: 'Planetary nebula',
+        summary: 'One of the most complex planetary nebulae ever seen: layers of glowing gas blown off by a dying star.',
+        stats: { 'Distance': '≈3,300 light-years', 'Constellation': 'Draco', 'Discovered': '1786, William Herschel', 'Age of bright core': '≈1,000 years' },
+        facts: ['Hubble revealed at least 11 rings around it, like the layers of an onion. The dying star puffed off a shell about every 1,500 years.', 'In 1864 William Huggins studied its light and proved for the first time that planetary nebulae are made of glowing gas, not stars.', 'The star at its center is about 80,000 °C, many times hotter than the Sun’s surface.', 'Our Sun may make a nebula like this in about 5 billion years.']
+    },
+    {
+        id: 'helix-nebula', cat: 'nebulae', name: 'Helix Nebula', type: 'Planetary nebula',
+        summary: 'One of the closest planetary nebulae, nicknamed the “Eye of God”.',
+        stats: { 'Distance': '≈650 light-years', 'Constellation': 'Aquarius' },
+        facts: ['It shows what our Sun may look like in billions of years.']
+    },
+    {
+        id: 'carina-nebula', cat: 'nebulae', name: 'Carina Nebula', type: 'Emission nebula',
+        summary: 'A huge star-forming region in the southern sky.',
+        stats: { 'Distance': '≈8,500 light-years', 'Constellation': 'Carina' },
+        facts: ['It contains Eta Carinae, one of the most massive stars known.', 'JWST’s “Cosmic Cliffs” image from July 2022 shows part of it.']
+    },
+    {
+        id: 'horsehead-nebula', cat: 'nebulae', name: 'Horsehead Nebula', type: 'Dark nebula',
+        summary: 'A dark cloud of dust shaped like a horse’s head.',
+        stats: { 'Distance': '≈1,375 light-years', 'Constellation': 'Orion' },
+        facts: ['It looks dark because thick dust blocks the glowing gas behind it.']
+    },
+
+    {
+        id: 'milky-way', cat: 'galaxies', name: 'Milky Way', type: 'Barred spiral galaxy',
+        summary: 'Our home galaxy.',
+        stats: { 'Diameter': '≈100,000 light-years', 'Stars': '100–400 billion', 'Sun’s distance from center': '≈26,000 light-years' },
+        facts: ['The Sun takes about 230 million years to orbit the galaxy once.', 'The black hole Sagittarius A* sits at its center.']
+    },
+    {
+        id: 'andromeda', cat: 'galaxies', name: 'Andromeda Galaxy (M31)', type: 'Spiral galaxy',
+        summary: 'The nearest large galaxy to the Milky Way.',
+        stats: { 'Distance': '≈2.5 million light-years', 'Diameter': '≈220,000 light-years', 'Stars': '≈1 trillion' },
+        facts: ['It is the most distant object most people can see with the naked eye.', 'It is approaching us at about 110 km/s; a 2025 study gives roughly a 50/50 chance of a merger within 10 billion years.']
+    },
+    {
+        id: 'triangulum', cat: 'galaxies', name: 'Triangulum Galaxy (M33)', type: 'Spiral galaxy',
+        summary: 'The third-largest galaxy in our Local Group.',
+        stats: { 'Distance': '≈2.7 million light-years', 'Diameter': '≈60,000 light-years' },
+        facts: ['Under very dark skies it can just be seen without a telescope.']
+    },
+    {
+        id: 'lmc', cat: 'galaxies', name: 'Large Magellanic Cloud', type: 'Dwarf galaxy',
+        summary: 'A satellite galaxy of the Milky Way, visible from the Southern Hemisphere.',
+        stats: { 'Distance': '≈160,000 light-years', 'Diameter': '≈14,000 light-years' },
+        facts: ['Supernova 1987A exploded here.', 'Its Tarantula Nebula is the most active star-forming region in the Local Group.']
+    },
+    {
+        id: 'smc', cat: 'galaxies', name: 'Small Magellanic Cloud', type: 'Dwarf galaxy',
+        summary: 'A smaller companion of the Large Magellanic Cloud.',
+        stats: { 'Distance': '≈200,000 light-years' },
+        facts: ['The Magellanic Clouds were known for thousands of years before Magellan’s voyage.']
+    },
+    {
+        id: 'sombrero', cat: 'galaxies', name: 'Sombrero Galaxy (M104)', type: 'Spiral galaxy',
+        summary: 'A galaxy with a bright bulge and a dark dust lane, shaped like a hat.',
+        stats: { 'Distance': '≈30 million light-years', 'Diameter': '≈50,000 light-years' },
+        facts: ['Its center hosts a black hole of about a billion Suns.']
+    },
+    {
+        id: 'whirlpool', cat: 'galaxies', name: 'Whirlpool Galaxy (M51)', type: 'Spiral galaxy',
+        summary: 'A classic spiral galaxy interacting with a smaller neighbor.',
+        stats: { 'Distance': '≈31 million light-years' },
+        facts: ['In 1845 it became the first galaxy seen to have a spiral shape.']
+    },
+    {
+        id: 'm87', cat: 'galaxies', name: 'Messier 87', type: 'Giant elliptical galaxy',
+        summary: 'A huge galaxy in the Virgo Cluster, home to the black hole M87*.',
+        stats: { 'Distance': '≈54 million light-years', 'Globular clusters': '≈12,000' },
+        facts: ['A jet of particles shoots out of its center at nearly the speed of light.']
+    },
+    {
+        id: 'distant-galaxies', cat: 'galaxies', name: 'Most Distant Galaxies', type: 'Early universe',
+        summary: 'JWST is finding galaxies that formed only a few hundred million years after the Big Bang.',
+        stats: { 'Example': 'JADES-GS-z14-0 (confirmed 2024)', 'Seen as it was': '≈290 million years after the Big Bang' },
+        facts: ['Looking far away means looking back in time.', 'Records keep being broken as JWST observes deeper.']
+    },
+    {
+        id: 'local-group', cat: 'galaxies', name: 'Local Group & Laniakea', type: 'Galaxy groups',
+        summary: 'The Milky Way belongs to the Local Group, which is part of the Laniakea Supercluster.',
+        stats: { 'Local Group size': '≈10 million light-years', 'Members': '80+ galaxies' },
+        facts: ['Laniakea means “immeasurable heaven” in Hawaiian.']
+    },
+
+    {
+        id: 'dark-matter', cat: 'dark-universe', name: 'Dark Matter', type: 'Invisible matter',
+        summary: 'Invisible matter that does not give off light, detected only through its gravity.',
+        stats: { 'Share of universe': '≈27%', 'Share of all matter': '≈85%', 'Directly detected?': 'Not yet' },
+        facts: ['Fritz Zwicky first suggested it in 1933 while studying the Coma Cluster.', 'Vera Rubin showed in the 1970s that galaxies spin too fast to be held together by visible matter alone.', 'The Bullet Cluster shows dark matter separated from normal gas after a collision.', 'ESA’s Euclid telescope is mapping it across billions of galaxies.']
+    },
+    {
+        id: 'dark-energy', cat: 'dark-universe', name: 'Dark Energy', type: 'Unknown energy',
+        summary: 'A mysterious energy causing the expansion of the universe to speed up.',
+        stats: { 'Share of universe': '≈68%', 'Discovered': '1998' },
+        facts: ['Two teams studying distant supernovae found the expansion is accelerating, winning the 2011 Nobel Prize.', 'Recent DESI survey results hint it may change over time — scientists are still testing this.']
+    },
+    {
+        id: 'normal-matter', cat: 'dark-universe', name: 'Ordinary Matter', type: 'Atoms',
+        summary: 'Everything made of atoms: stars, planets, gas and you.',
+        stats: { 'Share of universe': '≈5%' },
+        facts: ['Most ordinary matter is hot thin gas between galaxies, not stars.']
+    },
+    {
+        id: 'big-bang', cat: 'dark-universe', name: 'The Big Bang', type: 'Origin of the universe',
+        summary: 'The universe began in an extremely hot, dense state and has been expanding ever since.',
+        stats: { 'Age of universe': '≈13.8 billion years', 'First atoms': '≈380,000 years after', 'First stars': '≈100–200 million years after' },
+        facts: ['Georges Lemaître proposed the idea in the 1920s.', 'It was not an explosion in space — space itself started expanding.']
+    },
+    {
+        id: 'cmb', cat: 'dark-universe', name: 'Cosmic Microwave Background', type: 'Oldest light',
+        summary: 'Leftover glow from the early universe, filling all of space.',
+        stats: { 'Temperature': '2.725 K (−270.4 °C)', 'Discovered': '1965, Penzias & Wilson' },
+        facts: ['It is the oldest light we can see, released about 380,000 years after the Big Bang.', 'Satellites COBE, WMAP and Planck mapped it in detail.']
+    },
+    {
+        id: 'observable-universe', cat: 'dark-universe', name: 'Observable Universe', type: 'Everything we can see',
+        summary: 'The part of the universe whose light has had time to reach us.',
+        stats: { 'Diameter': '≈93 billion light-years', 'Galaxies': 'Hundreds of billions to ~2 trillion' },
+        facts: ['It is wider than 13.8 billion × 2 light-years because space kept expanding while light traveled.']
+    },
+    {
+        id: 'expansion', cat: 'dark-universe', name: 'Expansion & Hubble Tension', type: 'Cosmology puzzle',
+        summary: 'Galaxies are moving apart as space expands, but different methods disagree on how fast.',
+        stats: { 'Hubble constant': '≈67–73 km/s per megaparsec' },
+        facts: ['Edwin Hubble’s 1929 observations helped show the universe is expanding.', 'The mismatch between measurements, the “Hubble tension”, is still unsolved.']
+    },
+
+    {
+        id: 'sputnik-1', cat: 'missions', name: 'Sputnik 1', type: 'First artificial satellite',
+        summary: 'The beeping metal ball that started the Space Age.',
+        stats: { 'Agency': 'USSR', 'Launched': 'October 4, 1957', 'Destination': 'Earth orbit' },
+        facts: ['It was a 58 cm sphere that sent radio beeps anyone could hear.', 'It kicked off the Space Race.']
+    },
+    {
+        id: 'vostok-1', cat: 'missions', name: 'Vostok 1', type: 'First human spaceflight',
+        summary: 'Yuri Gagarin became the first human in space.',
+        stats: { 'Agency': 'USSR', 'Launched': 'April 12, 1961', 'Duration': '108 minutes' },
+        facts: ['Gagarin made one orbit of Earth.']
+    },
+    {
+        id: 'apollo-11', cat: 'missions', name: 'Apollo 11', type: 'First crewed Moon landing',
+        summary: 'Neil Armstrong and Buzz Aldrin walked on the Moon while Michael Collins orbited above.',
+        stats: { 'Agency': 'NASA', 'Launched': 'July 16, 1969', 'Landed': 'July 20, 1969' },
+        facts: ['Armstrong’s first words were “That’s one small step for man, one giant leap for mankind.”', 'The crew brought back about 21.5 kg of Moon rocks.']
+    },
+    {
+        id: 'voyager-1', cat: 'missions', name: 'Voyager 1', type: 'Interstellar probe',
+        summary: 'The farthest human-made object from Earth.',
+        stats: { 'Agency': 'NASA', 'Launched': 'September 5, 1977', 'Entered interstellar space': 'August 2012' },
+        facts: ['It is more than 24 billion km away.', 'In 1990 it took the “Pale Blue Dot” photo of Earth.', 'It carries a Golden Record with sounds and images of Earth.']
+    },
+    {
+        id: 'voyager-2', cat: 'missions', name: 'Voyager 2', type: 'Interstellar probe',
+        summary: 'The only spacecraft to visit Uranus and Neptune.',
+        stats: { 'Agency': 'NASA', 'Launched': 'August 20, 1977', 'Entered interstellar space': 'November 2018' },
+        facts: ['It flew past Uranus in 1986 and Neptune in 1989.']
+    },
+    {
+        id: 'hubble', cat: 'missions', name: 'Hubble Space Telescope', type: 'Space telescope',
+        summary: 'The telescope that transformed our view of the universe.',
+        stats: { 'Agency': 'NASA / ESA', 'Launched': 'April 24, 1990', 'Orbit': '≈540 km above Earth' },
+        facts: ['Its mirror had a flaw that astronauts fixed in 1993.', 'It helped pin down the age of the universe at about 13.8 billion years.']
+    },
+    {
+        id: 'jwst', cat: 'missions', name: 'James Webb Space Telescope', type: 'Space telescope',
+        summary: 'The most powerful space telescope ever built, seeing in infrared.',
+        stats: { 'Agency': 'NASA / ESA / CSA', 'Launched': 'December 25, 2021', 'Location': 'Sun–Earth L2, 1.5 million km away' },
+        facts: ['Its gold-coated mirror is 6.5 m wide, made of 18 segments.', 'Its sunshield is about the size of a tennis court.', 'It sees some of the first galaxies ever formed.']
+    },
+    {
+        id: 'iss', cat: 'missions', name: 'International Space Station', type: 'Crewed space station',
+        summary: 'A laboratory orbiting Earth, continuously crewed since 2000.',
+        stats: { 'Agencies': 'NASA, Roscosmos, ESA, JAXA, CSA', 'First module': 'November 1998', 'Altitude': '≈400 km', 'Speed': '≈28,000 km/h' },
+        facts: ['It circles Earth about 16 times a day.', 'It is about the size of a football field.', 'People have lived on it without a break since November 2, 2000.']
+    },
+    {
+        id: 'cassini', cat: 'missions', name: 'Cassini–Huygens', type: 'Saturn orbiter and Titan lander',
+        summary: 'Studied Saturn, its rings and moons for 13 years.',
+        stats: { 'Agencies': 'NASA / ESA / ASI', 'Launched': 'October 15, 1997', 'At Saturn': '2004–2017' },
+        facts: ['It discovered the water geysers of Enceladus.', 'It ended by diving into Saturn on September 15, 2017.']
+    },
+    {
+        id: 'new-horizons', cat: 'missions', name: 'New Horizons', type: 'Flyby probe',
+        summary: 'The first spacecraft to explore Pluto.',
+        stats: { 'Agency': 'NASA', 'Launched': 'January 19, 2006', 'Pluto flyby': 'July 14, 2015' },
+        facts: ['On January 1, 2019 it flew past Arrokoth, the most distant object ever explored up close.']
+    },
+    {
+        id: 'perseverance', cat: 'missions', name: 'Perseverance & Ingenuity', type: 'Mars rover and helicopter',
+        summary: 'A rover searching for signs of ancient life on Mars, with a small helicopter.',
+        stats: { 'Agency': 'NASA', 'Landed': 'February 18, 2021', 'Location': 'Jezero Crater, Mars' },
+        facts: ['Ingenuity made the first powered flight on another planet on April 19, 2021, and flew 72 times.', 'The rover is collecting rock samples for a possible future return to Earth.']
+    },
+    {
+        id: 'juno', cat: 'missions', name: 'Juno', type: 'Jupiter orbiter',
+        summary: 'A solar-powered spacecraft studying Jupiter’s interior and poles.',
+        stats: { 'Agency': 'NASA', 'Launched': 'August 5, 2011', 'Arrived at Jupiter': 'July 4, 2016' },
+        facts: ['It also made close flybys of the moons Ganymede, Europa and Io.']
+    },
+    {
+        id: 'rosetta', cat: 'missions', name: 'Rosetta & Philae', type: 'Comet orbiter and lander',
+        summary: 'The first mission to orbit a comet and land on it.',
+        stats: { 'Agency': 'ESA', 'Launched': 'March 2, 2004', 'At comet 67P': '2014–2016' },
+        facts: ['Philae bounced twice before settling on the comet.']
+    },
+    {
+        id: 'parker', cat: 'missions', name: 'Parker Solar Probe', type: 'Solar probe',
+        summary: 'The closest any spacecraft has flown to the Sun.',
+        stats: { 'Agency': 'NASA', 'Launched': 'August 12, 2018', 'Closest approach': '≈6.1 million km from the surface (Dec 24, 2024)' },
+        facts: ['At about 692,000 km/h, it is the fastest object ever built by humans.', 'It is the first spacecraft to fly through the Sun’s outer atmosphere, the corona.']
+    },
+    {
+        id: 'chandrayaan-3', cat: 'missions', name: 'Chandrayaan-3', type: 'Moon lander and rover',
+        summary: 'India’s first successful Moon landing, near the lunar south pole.',
+        stats: { 'Agency': 'ISRO', 'Launched': 'July 14, 2023', 'Landed': 'August 23, 2023' },
+        facts: ['India became the fourth country to soft-land on the Moon and the first near its south pole.']
+    },
+    {
+        id: 'change', cat: 'missions', name: 'Chang’e 4 & Chang’e 6', type: 'Moon landers',
+        summary: 'China’s missions to the far side of the Moon.',
+        stats: { 'Agency': 'CNSA', 'Chang’e 4 landed': 'January 3, 2019', 'Chang’e 6 samples returned': 'June 2024' },
+        facts: ['Chang’e 4 made the first landing on the Moon’s far side.', 'Chang’e 6 brought back the first samples from the far side.']
+    },
+    {
+        id: 'artemis-1', cat: 'missions', name: 'Artemis I', type: 'Uncrewed Moon mission',
+        summary: 'A test flight of NASA’s Orion capsule around the Moon, preparing for astronauts to return.',
+        stats: { 'Agency': 'NASA', 'Launched': 'November 16, 2022', 'Duration': '25.5 days' },
+        facts: ['Orion flew farther from Earth than any spacecraft built for humans.']
+    },
+    {
+        id: 'gaia', cat: 'missions', name: 'Gaia', type: 'Star-mapping telescope',
+        summary: 'Built the most precise 3D map of the Milky Way.',
+        stats: { 'Agency': 'ESA', 'Launched': 'December 19, 2013', 'Retired': 'March 2025' },
+        facts: ['It measured the positions and motions of about 2 billion stars.', 'Its data revealed the black holes Gaia BH1, BH2 and BH3.']
+    },
+    {
+        id: 'dart', cat: 'missions', name: 'DART', type: 'Planetary defense test',
+        summary: 'Crashed into an asteroid on purpose to see if we could change its path.',
+        stats: { 'Agency': 'NASA', 'Launched': 'November 24, 2021', 'Impact': 'September 26, 2022' },
+        facts: ['It shortened the orbit of the asteroid Dimorphos by about 32 minutes.']
+    },
+    {
+        id: 'euclid', cat: 'missions', name: 'Euclid', type: 'Space telescope',
+        summary: 'Mapping billions of galaxies to study dark matter and dark energy.',
+        stats: { 'Agency': 'ESA', 'Launched': 'July 1, 2023', 'Location': 'Sun–Earth L2' },
+        facts: ['It measures how dark matter bends the light of distant galaxies.']
+    },
+    {
+        id: 'europa-clipper', cat: 'missions', name: 'Europa Clipper', type: 'Jupiter moon explorer',
+        summary: 'Will study whether Jupiter’s moon Europa could support life.',
+        stats: { 'Agency': 'NASA', 'Launched': 'October 14, 2024', 'Arrival': '2030' },
+        facts: ['It is the largest spacecraft NASA has built for a planetary mission.']
+    }
+];
+
+function clean(text) {
+    return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’‘'`]/g, '').replace(/[^a-z0-9* ]+/g, ' ').replace(/^the /, '').replace(/\s+/g, ' ').trim();
+}
+
+function distance(a, b) {
+    const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+        let prev = row[0];
+        row[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+            const temp = row[j];
+            row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+            prev = temp;
+        }
+    }
+    return row[b.length];
+}
+
+const SpaceDB = {
+    categories: SPACE_CATEGORIES,
+    items: SPACE_ITEMS,
+
+    get(id) {
+        return SPACE_ITEMS.find((item) => item.id === id) || null;
+    },
+
+    category(id) {
+        return SPACE_CATEGORIES.find((cat) => cat.id === id) || null;
+    },
+
+    byCategory(catId) {
+        if (!catId || catId === 'all') return SPACE_ITEMS.slice();
+        return SPACE_ITEMS.filter((item) => item.cat === catId);
+    },
+
+    count(catId) {
+        return this.byCategory(catId).length;
+    },
+
+    search(text, catId) {
+        const q = text.trim().toLowerCase();
+        const pool = this.byCategory(catId);
+        if (!q) return pool;
+        return pool.filter((item) => {
+            const haystack = [item.name, item.type, item.summary, ...item.facts, ...Object.values(item.stats)].join(' ').toLowerCase();
+            return haystack.includes(q);
+        });
+    },
+
+    suggest(text, limit = 7) {
+        const q = clean(text);
+        if (!q) return [];
+        const scored = SPACE_ITEMS.map((item) => {
+            const name = clean(item.name);
+            const words = name.split(' ');
+            const cat = this.category(item.cat);
+            let score = 0;
+            let fuzzy = false;
+            if (name === q || words.join('') === q) score = 100;
+            else if (name.startsWith(q)) score = 90;
+            else if (words.some((w) => w.startsWith(q))) score = 80;
+            else if (name.includes(q)) score = 70;
+            else if (clean(item.type).includes(q) || clean(cat.name).includes(q)) score = 50;
+            else if (clean(item.summary + ' ' + item.facts.join(' ')).includes(q)) score = 30;
+            else if (q.includes(' ') && q.split(' ').every((qw) => clean(item.name + ' ' + item.type + ' ' + cat.name).split(' ')
+                .some((w) => w.startsWith(qw) || distance(qw, w) <= Math.max(1, Math.floor(qw.length / 3))))) {
+                score = 55;
+                fuzzy = true;
+            } else {
+                const allowed = Math.max(1, Math.floor(q.length / 3));
+                const best = Math.min(distance(q, name), ...words.map((w) => distance(q, w)));
+                const textWords = clean(item.summary + ' ' + item.facts.join(' ')).split(' ').filter((w) => w.length > 3);
+                const textBest = Math.min(99, ...textWords.map((w) => distance(q, w)));
+                const nameScore = best <= allowed ? 60 - best * 15 : 0;
+                const textScore = textBest <= allowed ? 45 - textBest * 10 : 0;
+                score = Math.max(nameScore, textScore);
+                fuzzy = score > 0;
+            }
+            return { item, score, fuzzy, similar: false };
+        }).filter((r) => r.score > 0).sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
+
+        const results = scored.slice(0, limit);
+        if (results.length > 0 && results.length < limit) {
+            const top = results[0].item;
+            SPACE_ITEMS.filter((item) => item.cat === top.cat && !results.some((r) => r.item === item))
+                .slice(0, limit - results.length)
+                .forEach((item) => results.push({ item, score: 0, fuzzy: false, similar: true }));
+        }
+        if (results.length === 0) {
+            return SPACE_ITEMS.map((item) => ({ item, d: distance(q, clean(item.name)) }))
+                .sort((a, b) => a.d - b.d)
+                .slice(0, 5)
+                .map((r) => ({ item: r.item, score: 0, fuzzy: true, similar: false }));
+        }
+        return results;
+    },
+
+    randomFact() {
+        const item = SPACE_ITEMS[Math.floor(Math.random() * SPACE_ITEMS.length)];
+        const fact = item.facts[Math.floor(Math.random() * item.facts.length)];
+        return { item, fact };
+    }
+};
